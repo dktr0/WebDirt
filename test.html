@@ -1,5 +1,7 @@
+<!DOCTYPE html>
 <html>
 <head>
+<meta charset="utf-8"/>
 <script src="SampleBank.js"></script>
 <script src="WebDirt.js"></script>
 <script src="Graph.js"></script>
@@ -21,30 +23,31 @@ WebDirt.prototype.testWebAudioIsWorking = function() {
 	// envelope
 	var now = this.ac.currentTime;
 	gain.gain.setValueAtTime(0,now);
-  gain.gain.linearRampToValueAtTime(amp,now+0.005);
+  gain.gain.linearRampToValueAtTime(1,now+0.005);
   gain.gain.linearRampToValueAtTime(0,now+0.405);
 }
 
 WebDirt.prototype.testSampleBankGetsBuffer = function() {
   var source = this.ac.createBufferSource();
-  source.buffer = this.sampleBank.getBuffer('cp/HANDCLP0.wav');
+  source.buffer = this.sampleBank.getBuffer('cp',0);
   source.connect(this.ac.destination);
   var soon = this.ac.currentTime+0.1;
   source.start(soon);
 }
 
 WebDirt.prototype.testPlaybackOfSimpleMessage = function(){
-  // var source = this.ac.createBufferSource();
-  // source.buffer = this.sampleBank.getBuffer('cp/HANDCLP0.wav');
-  // source.connect(this.ac.destination);
+  var msg = { sample_name: 'cp', sample_n:0, when:0 };
+  queue(msg);
+}
 
-  var msg = {
-    sample_name: "cp/HANDCLP0.wav",
-    when:0
-  }
-
-  queue(msg)
-
+WebDirt.prototype.testComplexMessage = function() {
+  var msg = {};
+  msg.sample_name = document.getElementById('sample_name');
+  msg.sample_n = document.getElementById('sample_n');
+  msg.speed = document.getElementById('speed');
+  msg.shape = document.getElementById('shape');
+  msg.when = this.ac.currentTime+0.1;
+  queue(msg);
 }
 
 </script>
@@ -54,5 +57,12 @@ WebDirt.prototype.testPlaybackOfSimpleMessage = function(){
   <button onclick="webDirt.testWebAudioIsWorking()">testWebAudioIsWorking</button>
   <button onclick="webDirt.testSampleBankGetsBuffer()">testSampleBankGetsBuffer</button>
   <button onclick="webDirt.testPlaybackOfSimpleMessage()">testPlaybackOfSimpleMessage</button>
+  <div border="1px solid black">
+    <div>sample_name: <textarea id="sample_name"></textarea></div>
+    <div>sample_n: <textarea id="sample_n"></textarea></div>
+    <div>speed: <textarea id="speed"></textarea></div>
+    <div>shape: <textarea id="shape"></textarea></div>
+    <button onclick="webDirt.testComplexMessage()">testComplexMessage</button>
+  </div>
 </body>
 </html>

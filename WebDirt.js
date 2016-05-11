@@ -7,7 +7,5 @@ WebDirt = function() {
   catch(e) {
     alert('Web Audio API is not supported in this browser');
   }
-  this.sampleBank = new SampleBank('samples',this.ac);
-  this.sampleBank.load('cp/HANDCLP0.wav');
-  this.sampleBank.load('cp/HANDCLPA.wav');
+  this.sampleBank = new SampleBank('sampleMap.json','samples',this.ac);
 }
