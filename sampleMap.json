@@ -1,0 +1,5 @@
+{ "cp": ["cp/HANDCLP0.wav","cp/HANDCLPA.wav"],
+  "bd": ["bd/BT0A0A7.wav","bd/BT0A0DA.wav","bd/BT3A0D0.wav","bd/BT3A0DA.wav","bd/BT7A0D0.wav","bd/BT7A0DA.wav","bd/BTAA0D0.wav","bd/BTAA0DA.wav",
+  "bd/BT0A0D0.wav","bd/BT0AAD0.wav","bd/BT3A0D3.wav","bd/BT3AAD0.wav","bd/BT7A0D3.wav","bd/BT7AAD0.wav","bd/BTAA0D3.wav","bd/BTAAAD0.wav",
+  "bd/BT0A0D3.wav","bd/BT0AADA.wav","bd/BT3A0D7.wav","bd/BT3AADA.wav","bd/BT7A0D7.wav","bd/BT7AADA.wav","bd/BTAA0D7.wav","bd/BTAAADA.wav"]
+}
