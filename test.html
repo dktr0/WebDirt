@@ -21,7 +21,7 @@ WebDirt.prototype.testWebAudioIsWorking = function() {
 	// envelope
 	var now = this.ac.currentTime;
 	gain.gain.setValueAtTime(0,now);
-  gain.gain.linearRampToValueAtTime(amp,now+0.005);
+  gain.gain.linearRampToValueAtTime(0.1,now+0.005);
   gain.gain.linearRampToValueAtTime(0,now+0.405);
 }
 
@@ -39,11 +39,15 @@ WebDirt.prototype.testPlaybackOfSimpleMessage = function(){
   // source.connect(this.ac.destination);
 
   var msg = {
+  	ac: this.ac,
     sample_name: "cp/HANDCLP0.wav",
-    when:0
+    when:0,
+    start:0,
+    speed:2,
+    delay:0.2
   }
 
-  queue(msg)
+  queue(msg);
 
 }
 
