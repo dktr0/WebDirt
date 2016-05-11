@@ -1,0 +1,17 @@
+<html>
+<head>
+<script src="SampleBank.js"></script>
+<script src="WebDirt.js"></script>
+<script>
+var webDirt;
+
+function onload() {
+  webDirt = new WebDirt();
+}
+</script>
+</head>
+<body onload="onload()">
+  <div>WebDirt test page</div>
+  <button onclick="webDirt.test()">test</button>
+</body>
+</html>

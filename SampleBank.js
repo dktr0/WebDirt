@@ -1,7 +1,8 @@
 
-SampleBank = function(urlPrefix) {
+SampleBank = function(urlPrefix,audioContext) {
   this.urlPrefix = urlPrefix;
   this.samples = {};
+  this.ac = audioContext;
 }
 
 SampleBank.prototype.load = function(name) {
@@ -22,7 +23,7 @@ SampleBank.prototype.load = function(name) {
   request.responseType = 'arraybuffer';
   var closure = this; // a closure is necessary for...
   request.onload = function() {
-      ac.decodeAudioData(request.response, function(x) {
+      closure.ac.decodeAudioData(request.response, function(x) {
         console.log("sample " + url + "loaded");
         closure.samples[name].buffer = x; // ...the decoded data to be kept in the object
         closure.samples[name].status = 'ready';
@@ -47,5 +48,5 @@ SampleBank.prototype.getBuffer = function(name) {
   if(this.samples[name].status == 'loading') {
     console.log("SampleBank.getBuffer: sample" + name + " is still loading");
   }
-  return samples[name].buffer;
+  return this.samples[name].buffer;
 }
