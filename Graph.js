@@ -28,10 +28,11 @@ function Graph(msg){
 	
 	this.sample_name=msg.sample_name;
 	this.when= msg.when;
-	this.source = ac.createBufferSource();
+	//alert(ac);
+	this.source = webDirt.ac.createBufferSource();
 
 
-	this.source.buffer = sampleBank.getBuffer(this.sample_name);
+	this.source.buffer = webDirt.sampleBank.getBuffer(this.sample_name);
 	
 	if(this.source.buffer==null){
 		console.log("Unable to load - node killed");
