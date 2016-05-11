@@ -36,18 +36,18 @@ WebDirt.prototype.testSampleBankGetsBuffer = function() {
 }
 
 WebDirt.prototype.testPlaybackOfSimpleMessage = function(){
-  var msg = { sample_name: 'cp', sample_n:0, when:0 };
-  queue(msg);
+  var msg = { sample_name: 'cp', sample_n:0, when:this.ac.currentTime+0.1, speed: 1 };
+  this.queue(msg);
 }
 
 WebDirt.prototype.testComplexMessage = function() {
   var msg = {};
-  msg.sample_name = document.getElementById('sample_name');
-  msg.sample_n = document.getElementById('sample_n');
-  msg.speed = document.getElementById('speed');
-  msg.shape = document.getElementById('shape');
+  msg.sample_name = document.getElementById('sample_name').value;
+  msg.sample_n = document.getElementById('sample_n').value;
+  msg.speed = document.getElementById('speed').value;
+  msg.shape = document.getElementById('shape').value;
   msg.when = this.ac.currentTime+0.1;
-  queue(msg);
+  this.queue(msg);
 }
 
 </script>

@@ -2,43 +2,29 @@
 
 
 
-function queue(msg){
 
 
-	if(msg.when==null){
-		throw Error ("Sample given no 'when' parameter");
+
+function Graph(msg,ac,sampleBank){
+	var last;
+	this.source = ac.createBufferSource();
+	this.source.buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
+	if(this.source.buffer==null) throw Error("Unable to get buffer for " + msg.sample_name + ":" + msg.sample_n);
+	if(msg.speed!=0) this.source.playbackRate.value=msg.speed;
+	last = this.source;
+	this.source.start(msg.when);
+
+	/* other plugins here */
+
+	/*
+	if(someCondition) {
+		var b = ac.createSomeOptionalAudioNode();
+		last.connect(b); last = b;
 	}
+	*/
 
-
-	try{
-
-	var graph = new Graph(msg);
-	
-	} catch (e){
-		alert(e.stack);
-	}
-
-
-  	graph.source.connect(msg.ac.destination);
-	graph.source.start(0);
-
-
+	last.connect(ac.destination);
 }
-
-
-
-function Graph(msg){
-	
-	this.sample_name=msg.sample_name;
-	this.when= msg.when;
-	this.speed = msg.speed;
-
-	this.source = msg.ac.createBufferSource();
-
-
-
-	this.source.buffer = msg.ac.sampleBank.getBuffer(this.sample_name);
-
 
 	// this.shape = webDirt.createWaveShaper();
 	// //400 chosen arbitrarily?
@@ -46,9 +32,6 @@ function Graph(msg){
 
 	// this.source.connect(this.shape);
 
-	if(this.speed!=0){
-		this.source.playbackRate.value=this.speed;
-	}
 
 
 // 	console.log(this.source.buffer.numberOfChannels);
@@ -58,7 +41,7 @@ function Graph(msg){
 
 // 	array = this.source.buffer.getChannelData(0);
 // 	//this.source.buffer.copyFromChannel(array,0,0);
-	
+
 
 // 	// array =this.source.buffer.getChannelData(0);
 // 	var i = 0;
@@ -78,23 +61,6 @@ function Graph(msg){
 // 	this.source.buffer = array;
 // //	this.source.buffer.copyToChannel(array,0,0);
 
-
-	
-
-
-	if(this.source.buffer==null){
-		console.log("Unable to load - node killed@");
-
-		return 0;
-	}
-	else{
-	}
-
-
-
-}
-
-
 //Borrowed from documentation @may want to redo/make differently
 function makeDistortionCurve(amount) {
   var k = typeof amount === 'number' ? amount : 50,
@@ -110,7 +76,7 @@ function makeDistortionCurve(amount) {
   return curve;
 };
 
-//timeout for when 
+//timeout for when
 
 
 
@@ -148,7 +114,7 @@ function makeDistortionCurve(amount) {
 	// else {
 	// 	this.cutoff=msg.cutoff;
 	// }
-	
+
 	// if(msg.resonance<0 || msg.resonance>1){
 	// 	this.resonance=1;
 	// }
@@ -191,7 +157,7 @@ function makeDistortionCurve(amount) {
 	// else {
 	// 	this.cutoff=msg.cutoff;
 	// }
-	
+
 	// if(msg.hresonance<0 || msg.hresonance>1){
 	// 	this.hresonance=1;
 	// }
@@ -209,6 +175,3 @@ function makeDistortionCurve(amount) {
 //crush and coarse - more difficutl
 //this.source.loop=true;
 //distortion - in webaudioapi..
-
-
-

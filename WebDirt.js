@@ -9,3 +9,8 @@ WebDirt = function() {
   }
   this.sampleBank = new SampleBank('sampleMap.json','samples',this.ac);
 }
+
+WebDirt.prototype.queue = function(msg) {
+	if(msg.when==null) throw Error ("Sample given no 'when' parameter");
+	var graph = new Graph(msg,this.ac,this.sampleBank);
+}
