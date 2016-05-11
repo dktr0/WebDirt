@@ -1,110 +1,51 @@
 
+SampleBank = function(urlPrefix) {
+  this.urlPrefix = urlPrefix;
+  this.samples = {};
+}
 
-SimpleMonoSample = function(url) {
-  this.url = url;
+SampleBank.prototype.load = function(name) {
+  if(this.samples[name] != null) {
+    if(this.samples[name].status == 'ready') {
+        console.log('warning: already loaded sample ' + name);
+        return;
+    }
+    if(this.samples[name].status == 'loading') {
+        console.log('warning: loading already in progress for sample ' + name);
+        return;
+    }
+  }
+  this.samples[name] = { status: 'loading' };
+  var url = this.urlPrefix + "/" + name;
   var request = new XMLHttpRequest();
   request.open('GET',url,true);
   request.responseType = 'arraybuffer';
   var closure = this; // a closure is necessary for...
   request.onload = function() {
-      var data = request.response;
-      ac.decodeAudioData(data, function(x) {
-        console.log("buffer loaded");
-        closure.buffer = x; // ...the decoded data to be kept in the object
+      ac.decodeAudioData(request.response, function(x) {
+        console.log("sample " + url + "loaded");
+        closure.samples[name].buffer = x; // ...the decoded data to be kept in the object
+        closure.samples[name].status = 'ready';
       },
       function(err) {
-        console.log("error decoding buffer");
+        console.log("error decoding sample " + url);
+        closure.samples[name].status = 'error';
       });
   };
   request.send();
-  this.gain = ac.createGain();
-  this.gain.connect(ac.destination);
-  this.playing = false;
 }
 
-SimpleMonoSample.prototype.play = function (amp,dur,rate,startPos) {
-  if(amp == null) amp = 1;
-  if(rate == null) rate = 1; // if 2nd argument not given, defaults to 1
-  if(startPos == null) startPos = 0.0; // if 3rd arg not given, defaults 0
-  if(this.playing == false) { // only play if not already playing
-    this.playing = true;
-    this.source = ac.createBufferSource();
-    this.source.playbackRate.value = rate;
-    this.source.buffer = this.buffer;
-    this.source.connect(this.gain);
-    var now = ac.currentTime;
-    this.source.start(now,startPos);
-    this.gain.gain.setValueAtTime(0,now);
-    this.gain.gain.linearRampToValueAtTime(amp,now+0.003); // 3 ms fade-in
-    if (dur > 0){
-      this.gain.gain.linearRampToValueAtTime(amp,now+dur-0.003);  // hold
-      this.gain.gain.linearRampToValueAtTime(0,now+dur);  // 3 ms fade-out
-    }
-    var closure = this;
-    setTimeout(function() {
-      closure.playing = false; // make synth available again...
-    },(dur*1000)+250); // ...a quarter second after envelope finishes
-  } else console.log("warning: attempt to play synth that was already playing");
-}
-
-function apertInitialize() {
-  simpleMonoSampleBank = new Array(10);
-  for(var n=0;n<10;n++) {
-    console.log("created synth " + n)
-    // simpleMonoSampleBank[n] = new SimpleMonoSample("uhoh-mono-16bit.wav");
-    simpleMonoSampleBank[n] = new SimpleMonoSample("RockScrape11.wav");
+SampleBank.prototype.getBuffer = function(name) {
+  if(this.samples[name] == null) {
+    console.log("SampleBank.getBuffer: sample " + name + "doesn't exist");
+    return null;
   }
-}
-
-function playSimpleMonoSample(amp,dur,rate,startPos) {
-  var n;
-  for(n=0;n<10;n++) {
-    if(simpleMonoSampleBank[n].playing==false)break;
+  if(this.samples[name].status == 'error') {
+    console.log("SampleBank.getBuffer: sample " + name + " has status error");
+    return null;
   }
-  if(n<10) {
-    simpleMonoSampleBank[n].play(amp,dur,rate,startPos);
+  if(this.samples[name].status == 'loading') {
+    console.log("SampleBank.getBuffer: sample" + name + " is still loading");
   }
-  else console.log("warning: all synth instances already plaing");
+  return samples[name].buffer;
 }
-
-function simpleSaw(freq,amp) {
-	var sine = ac.createOscillator();
-	sine.type = 'sawtooth';
-	sine.frequency.value = freq;
-	var gain = ac.createGain();
-	sine.connect(gain);
-	gain.connect(ac.destination);
-	sine.start();
-	// envelope
-	var now = ac.currentTime;
-	gain.gain.setValueAtTime(0,now);
-  gain.gain.linearRampToValueAtTime(amp,now+0.005); gain.gain.linearRampToValueAtTime(0,now+0.405);
-	// schedule cleanup
-	setTimeout(function() {
-		sine.stop();
-		sine.disconnect(gain);
-		gain.disconnect(ac.destination);
-	},1000);
-};
-
-function generativeSaw(freqs,amp) {
-  var temp = [220,330,440,550,660,770,880,990,1100];
-  var freq = temp[Math.floor(Math.random()*temp.length)];
-	var sine = ac.createOscillator();
-	sine.type = 'sawtooth';
-	sine.frequency.value = freq;
-	var gain = ac.createGain();
-	sine.connect(gain);
-	gain.connect(ac.destination);
-	sine.start();
-	// envelope
-	var now = ac.currentTime;
-	gain.gain.setValueAtTime(0,now);
-  gain.gain.linearRampToValueAtTime(amp,now+0.005); gain.gain.linearRampToValueAtTime(0,now+0.405);
-	// schedule cleanup
-	setTimeout(function() {
-		sine.stop();
-		sine.disconnect(gain);
-		gain.disconnect(ac.destination);
-	},1000);
-};
