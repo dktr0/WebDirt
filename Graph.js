@@ -19,6 +19,9 @@ function queue(msg){
 	}
 
 
+  	graph.source.connect(msg.ac.destination);
+	graph.source.start(0);
+
 
 }
 
@@ -28,26 +31,86 @@ function Graph(msg){
 	
 	this.sample_name=msg.sample_name;
 	this.when= msg.when;
-	this.source = ac.createBufferSource();
+	this.speed = msg.speed;
+
+	this.source = msg.ac.createBufferSource();
 
 
-	this.source.buffer = sampleBank.getBuffer(this.sample_name);
+
+	this.source.buffer = msg.ac.sampleBank.getBuffer(this.sample_name);
+
+
+	// this.shape = webDirt.createWaveShaper();
+	// //400 chosen arbitrarily?
+	// this.shape.curve.value = makeDistortionCurve(400);
+
+	// this.source.connect(this.shape);
+
+	if(this.speed!=0){
+		this.source.playbackRate.value=this.speed;
+	}
+
+
+// 	console.log(this.source.buffer.numberOfChannels);
+// 	console.log(this.source.buffer.getChannelData(0).length);
+
+// 	var array = new Float32Array;
+
+// 	array = this.source.buffer.getChannelData(0);
+// 	//this.source.buffer.copyFromChannel(array,0,0);
 	
+
+// 	// array =this.source.buffer.getChannelData(0);
+// 	var i = 0;
+// 	while (i<array.length){
+
+// 		if (i%2==0)
+// 			array[i]==array[i]
+// 		else array[i]=0;
+// 	i++;
+// 	}
+
+// 	console.log(array)
+
+
+
+// 	console.log(array[0] +", " + array.length);
+// 	this.source.buffer = array;
+// //	this.source.buffer.copyToChannel(array,0,0);
+
+
+	
+
+
 	if(this.source.buffer==null){
-		console.log("Unable to load - node killed");
+		console.log("Unable to load - node killed@");
 
 		return 0;
 	}
 	else{
-		alert("loaded");
 	}
+
+
 
 }
 
 
+//Borrowed from documentation @may want to redo/make differently
+function makeDistortionCurve(amount) {
+  var k = typeof amount === 'number' ? amount : 50,
+    n_samples = 44100,
+    curve = new Float32Array(n_samples),
+    deg = Math.PI / 180,
+    i = 0,
+    x;
+  for ( ; i < n_samples; ++i ) {
+    x = i * 2 / n_samples - 1;
+    curve[i] = ( 3 + k ) * x * 20 * deg / ( Math.PI + k * Math.abs(x) );
+  }
+  return curve;
+};
 
-
-
+//timeout for when 
 
 
 
@@ -140,8 +203,12 @@ function Graph(msg){
 	// if (abs(msg.bandf))
 	// this.bandf=abs(msg.bandf)
 
-
-
+//script processor node -- inefficient..
+//pan - gain per channel
+//accelerate - playback.(envelope of some kind)
+//crush and coarse - more difficutl
+//this.source.loop=true;
+//distortion - in webaudioapi..
 
 
 
