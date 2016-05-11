@@ -11,27 +11,3 @@ WebDirt = function() {
   this.sampleBank.load('cp/HANDCLP0.wav');
   this.sampleBank.load('cp/HANDCLPA.wav');
 }
-
-WebDirt.prototype.test = function() {
-  var source = this.ac.createBufferSource();
-  source.buffer = this.sampleBank.getBuffer('cp/HANDCLP0.wav');
-  source.connect(this.ac.destination);
-  var soon = this.ac.currentTime+0.1;
-  source.start(soon);
-}
-
-
-WebDirt.prototype.test2 = function(){
-  // var source = this.ac.createBufferSource();
-  // source.buffer = this.sampleBank.getBuffer('cp/HANDCLP0.wav');
-  // source.connect(this.ac.destination);
-
-
-  var msg = {
-    sample_name: "cp/HANDCLP0.wav",
-    when:0
-  }
-
-  queue(msg)
-
-}
