@@ -6,26 +6,28 @@ SampleBank = function(sampleMapUrl,urlPrefix,audioContext) {
   if(audioContext == null) throw Error("audioContext argument to SampleBank constructor was null");
   this.ac = audioContext;
 
-  try {
-    var request = new XMLHttpRequest();
-    request.open('GET',this.sampleMapUrl,true);
-    request.responseType = "json";
-    var closure = this;
-    request.onload = function() {
-      if(request.readyState != 4) throw Error("readyState != 4 in callback of sampleMap load");
-      if(request.status != 200) throw Error("status != 200 in callback of sampleMap load");
-      if(request.response == null) throw Error("JSON response null in callback of sampleMap load");
-      closure.sampleMap = request.response;
-      console.log("sampleMap loaded from " + closure.sampleMapUrl);
-    };
-    request.send();
-  }
-  catch(e) {
-    console.log("exception during loading of sampleMap:" + e);
-  }
-
+  var request = new XMLHttpRequest();
+  request.open('GET',this.sampleMapUrl,true);
+  request.responseType = "json";
+  var closure = this;
+  request.onload = function() {
+    if(request.readyState != 4) throw Error("readyState != 4 in callback of sampleMap load");
+    if(request.status != 200) throw Error("status != 200 in callback of sampleMap load");
+    if(request.response == null) throw Error("JSON response null in callback of sampleMap load");
+    closure.sampleMap = request.response;
+    console.log("sampleMap loaded from " + closure.sampleMapUrl);
+  };
+  request.send();
 }
 
+// loads the set of samples with the same name (but different number)
+SampleBank.prototype.loadAllNamed = function(name) {
+  if(this.sampleMap == null) throw Error("SampleBank.loadAllNamed: sampleMap is null");
+  if(this.sampleMap[name] == null) throw Error("SampleBank.loadAllNamed: no sampleMap for " + name);
+  for(var n=0;n<this.sampleMap[name].length;n++) this.load(name,n);
+}
+
+// loads an individual sample
 SampleBank.prototype.load = function(name,number) {
   if(this.sampleMap == null) throw Error("SampleBank.load: sampleMap is null");
   if(this.sampleMap[name] == null) throw Error("SampleBank.load: no sampleMap for " + name);

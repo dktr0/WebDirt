@@ -23,7 +23,6 @@ WebDirt.prototype.testWebAudioIsWorking = function() {
 	// envelope
 	var now = this.ac.currentTime;
 	gain.gain.setValueAtTime(0,now);
-
   gain.gain.linearRampToValueAtTime(1,now+0.005);
   gain.gain.linearRampToValueAtTime(0,now+0.405);
 }
@@ -32,13 +31,12 @@ WebDirt.prototype.testSampleBankGetsBuffer = function() {
   var source = this.ac.createBufferSource();
   source.buffer = this.sampleBank.getBuffer('cp',0);
   source.connect(this.ac.destination);
-  var soon = this.ac.currentTime+0.1;
+  var soon = this.ac.currentTime+0.2;
   source.start(soon);
 }
 
 WebDirt.prototype.testPlaybackOfSimpleMessage = function(){
-
-  var msg = { sample_name: 'cp', sample_n:0, when:this.ac.currentTime+0.1, speed: 1 };
+  var msg = { sample_name: 'cp', sample_n:0, when:this.ac.currentTime+0.5, speed: 1 };
   this.queue(msg);
 }
 
@@ -49,7 +47,7 @@ WebDirt.prototype.testComplexMessage = function() {
   msg.sample_n = document.getElementById('sample_n').value;
   msg.speed = document.getElementById('speed').value;
   msg.shape = document.getElementById('shape').value;
-  msg.when = this.ac.currentTime+0.1;
+  msg.when = this.ac.currentTime+0.5;
   this.queue(msg);
 }
 
