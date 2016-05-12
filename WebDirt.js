@@ -37,7 +37,18 @@ WebDirt.prototype.subscribeToTidalSocket = function(withLog) {
       x.when = msg.args[0] + (msg.args[1]/1000000) - diff;
       x.sample_name = msg.args[3];
       x.sample_n = msg.args[29];
-      x.speed = 1;
+      
+      x.speed = msg.args[7];
+      x.cutoff = msg.args[11];
+      x.resonance = msg.args[12];
+      x.accelerate = msg.args[13];
+      x.shape = msg.args[14];
+      x.hcutoff = msg.args[23];
+      x.hresonance = msg.args[24];
+      x.bandf = msg.args[25];
+      x.bandq = msg.args[26];
+
+3
       closure.queue(x);
       if(withLog)console.log(msg);
     }

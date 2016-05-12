@@ -3,6 +3,8 @@ function Graph(msg,ac,sampleBank){
 	var last;
 	this.source = last = ac.createBufferSource();
 	var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
+	var temp;
+
 	if(buffer == null) { // buffer not available but may be available soon
 		var closure = this;
 		var reattemptDelay = (msg.when-ac.currentTime-0.2)*1000;
@@ -20,7 +22,71 @@ function Graph(msg,ac,sampleBank){
 	}
 	else { // buffer is currently available
 		this.source.buffer = buffer;
+
+		//Speed
 		if(msg.speed != null) this.source.playbackRate.value=msg.speed;
+
+		if(msg.accelerate!=0){
+			this.source.playbackRate.linearRampToValueAtTime(msg.accelerate,this.source.buffer.duration);
+		}
+
+
+		//Distortion Applied
+		if(msg.shape!=null){
+				//Distortion limited to [0,0.99)
+			if (Math.abs(msg.shape)>1) msg.shape=0.99;
+			else msg.shape=Math.abs(msg.shape);
+
+			temp = ac.createWaveShaper();
+
+			//@Change makeDistortion Curve?
+			temp.curve = makeDistortionCurve(msg.shape*300);
+			temp.oversample = '2x';
+
+			//Connect Distortion to last, and pass on 'last'
+			last.connect(temp);
+			last=temp;
+		}
+
+		//Lowpass filtering @what to do with resonance, and what level/function to set frequency at?
+		if(msg.resonance>0 && msg.resonance<=1 && msg.cutoff>0 && msg.cutoff<=1){
+
+			temp = ac.createBiquadFilter();
+			temp.type = 'lowpass';
+			temp.frequency.value = msg.cutoff*14000;
+			temp.Q.value = 0.1;
+
+			last.connect(temp);
+			last = temp;
+
+
+		}
+
+		//hgihpass filtering @what to do with resonance, and what level/function to set frequency at?
+		if(msg.hresonance>0 && msg.hresonance<1 && msg.hcutoff>0 && msg.hcutoff<1){
+			temp = ac.createBiquadFilter();
+			temp.type = 'highpass';
+			temp.frequency.value = msg.hcutoff*10000;
+			temp.Q.value = 0.1;
+
+			last.connect(temp);
+			last = temp;
+		}
+
+		//Bandpass Filter
+		if(msg.bandf>0 && msg.bandf<1 && msg.bandq>0){
+			temp = ac.createBiquadFilter();
+			temp.type = 'bandpass';
+			temp.frequency.value = msg.bandf*10000;
+			temp.Q.value = msg.bandq;
+
+			last.connect(temp);
+			last = temp;
+		}
+
+
+
+
 		this.source.start(msg.when);
 	}
 
