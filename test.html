@@ -40,13 +40,21 @@ WebDirt.prototype.testPlaybackOfSimpleMessage = function(){
   this.queue(msg);
 }
 
-
 WebDirt.prototype.testComplexMessage = function() {
   var msg = {};
   msg.sample_name = document.getElementById('sample_name').value;
   msg.sample_n = document.getElementById('sample_n').value;
-  msg.speed = document.getElementById('speed').value;
+  console.log(msg.sample_name);
+  console.log(msg.sample_n);
+  /* msg.speed = document.getElementById('speed').value;
+  msg.cutoff = document.getElementById('cutoff').value;
+  msg.resonance = document.getElementById('resonance').value;
+  msg.accelerate = document.getElementById('accelerate').value;
   msg.shape = document.getElementById('shape').value;
+  msg.hcutoff = document.getElementById('hcutoff').value;
+  msg.hresonance = document.getElementById('hresonance').value;
+  msg.bandf = document.getElementById('bandf').value;
+  msg.bandq = document.getElementById('bandq').value; */
   msg.when = this.ac.currentTime+0.5;
   this.queue(msg);
 }
@@ -62,7 +70,15 @@ WebDirt.prototype.testComplexMessage = function() {
     <div>sample_name: <textarea id="sample_name"></textarea></div>
     <div>sample_n: <textarea id="sample_n"></textarea></div>
     <div>speed: <textarea id="speed"></textarea></div>
+    <div>cutoff: <textarea id="cutoff"></textarea></div>
+    <div>resonance: <textarea id="resonance"></textarea></div>
+    <div>accelerate: <textarea id="accelerate"></textarea></div>
     <div>shape: <textarea id="shape"></textarea></div>
+    <div>hcutoff: <textarea id="hcutoff"></textarea></div>
+    <div>hresonance: <textarea id="hresonance"></textarea></div>
+    <div>bandf: <textarea id="bandf"></textarea></div>
+    <div>bandq: <textarea id="bandq"></textarea></div>
+
     <button onclick="webDirt.testComplexMessage()">testComplexMessage</button>
   </div>
   <button onclick="webDirt.subscribeToTidalSocket(true)">subscribeToTidalSocket</button>
