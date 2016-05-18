@@ -40,6 +40,8 @@ WebDirt.prototype.testPlaybackOfSimpleMessage = function(){
   this.queue(msg);
 }
 
+
+
 WebDirt.prototype.testComplexMessage = function() {
   var msg = {};
   msg.sample_name = document.getElementById('sample_name').value;
@@ -54,7 +56,6 @@ WebDirt.prototype.testComplexMessage = function() {
   msg.bandf = document.getElementById('bandf').value;
   msg.bandq = document.getElementById('bandq').value;
   msg.when = this.ac.currentTime+0.5;
-  var string
   msg.cutoff= document.getElementById('cutoff').value;
   msg.resonance=0.1;
   this.queue(msg);

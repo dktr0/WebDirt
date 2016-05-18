@@ -25,7 +25,7 @@ function Graph(msg,ac,sampleBank){
 		if(msg.speed>=0){
 				this.source.buffer = buffer;
 		}
-		else{ 
+		else{
 				this.source = last =reverseBuffer(buffer,ac);
 				console.log("here");
 				//this.source.connect(ac.destination);
@@ -33,8 +33,10 @@ function Graph(msg,ac,sampleBank){
 
 
 		//Speed
-		if(msg.speed != null) this.source.playbackRate.value=Math.abs(msg.speed);
+		if(typeof msg.speed != 'number') msg.speed = 1;
+		this.source.playbackRate.value=Math.abs(msg.speed);
 
+		if(typeof msg.accelerate != 'number') msg.accelerate = 0;
 		if(msg.accelerate!=0){
 			console.log("accelerate")
 
@@ -43,7 +45,8 @@ function Graph(msg,ac,sampleBank){
 
 
 		//Distortion Applied
-		if(msg.shape!=null){
+		if(typeof msg.shape != 'number') msg.shape = 0;
+		if(msg.shape!=0){
 				//Distortion limited to [0,0.99)
 			if (Math.abs(msg.shape)>1) msg.shape=0.99;
 			else msg.shape=Math.abs(msg.shape);
@@ -66,7 +69,7 @@ function Graph(msg,ac,sampleBank){
 		// 	var offset = Math.trunc(this.source.buffer.length*msg.begin);
 
 		// 	this.source.buffer.copyFromChannel(pcmData,0,0);
-			
+
 		// 	console.log("offset: "+offset)
 
 		// 	var newChannelData = new Float32Array(offset)
@@ -87,7 +90,7 @@ function Graph(msg,ac,sampleBank){
 		// 	var envelope = ac.createGain()
 		// 	envelope.gain.value=0;
 		// 	envelope.gain.setValueAtTime(1,msg.when+msg.begin*this.source.buffer.duration);
-			
+
 		// 	//Start the sample playback earlier to compensate for muted beginning portion.
 		// 	msg.when = msg.when-(msg.begin)*this.source.buffer.duration
 
