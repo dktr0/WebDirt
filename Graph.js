@@ -157,7 +157,7 @@ function Graph(msg,ac,sampleBank){
 		}
 
 
-
+		if(typeof msg.coarse != 'number') msg.coarse = 1;
 		msg.coarse=Math.abs(msg.coarse);
 		console.log(msg.coarse)
 		if(msg.coarse>1){
@@ -203,6 +203,7 @@ function Graph(msg,ac,sampleBank){
 		if(msg.gain!=null) gain.gain.value= Math.abs(msg.gain);
 		else gain.gain.value =1;
 
+		if(typeof msg.delay != 'number') msg.delay = 0;
 		msg.delay=Math.abs(msg.delay);
 		//Delay
 		if(msg.delay!=0){
@@ -223,6 +224,9 @@ function Graph(msg,ac,sampleBank){
 			last.connect(gain);
 
 		//	last = temp;
+
+		if(typeof msg.begin != 'number') msg.begin = 0;
+		if(typeof msg.end != 'number') msg.end = 1;
 		this.source.start(msg.when,msg.begin*this.source.buffer.duration,msg.end*this.source.buffer.duration);
 
 	}
@@ -237,6 +241,8 @@ function Graph(msg,ac,sampleBank){
 	channelMerger.connect(ac.destination);
 	var gain1 = ac.createGain();
 	var gain2 = ac.createGain();
+
+	if(typeof msg.pan != 'number') msg.pan = 0.5;
 	gain1.gain.value=1-msg.pan;
 	gain.connect(gain1);
 	gain1.connect(channelMerger,0,0);
@@ -265,6 +271,24 @@ function makeDistortionCurve(amount) {
   }
   return curve;
 };
+
+
+/*
+function formants(input,vowel) {
+	if(typeof vowel != 'string') vowel = null;
+	if(vowel != null) {
+
+		filter.connect(input);
+		return filter;
+	} else return input;
+}
+
+var last;
+
+last = formants(last,msg.vowel);
+last = crush(last,msg.crush);
+last = ...
+*/
 
 
 //returns a buffer source with a buffer with bit resolution degraded
