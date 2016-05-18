@@ -1,8 +1,11 @@
-
+var test= true;
 function Graph(msg,ac,sampleBank){
 	var last;
 	this.source = last = ac.createBufferSource();
 	var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
+	this.revBuffer = reverseBuffer(buffer,ac);
+	var temp;
+
 	if(buffer == null) { // buffer not available but may be available soon
 		var closure = this;
 		var reattemptDelay = (msg.when-ac.currentTime-0.2)*1000;
@@ -19,9 +22,166 @@ function Graph(msg,ac,sampleBank){
 		},reattemptDelay);
 	}
 	else { // buffer is currently available
-		this.source.buffer = buffer;
-		if(msg.speed != null) this.source.playbackRate.value=msg.speed;
+		if(msg.speed>=0){
+				this.source.buffer = buffer;
+		}
+		else{ 
+				this.source = last =reverseBuffer(buffer,ac);
+				console.log("here");
+				//this.source.connect(ac.destination);
+		}
+
+
+		//Speed
+		if(msg.speed != null) this.source.playbackRate.value=Math.abs(msg.speed);
+
+		if(msg.accelerate!=0){
+			console.log("accelerate")
+
+			this.source.playbackRate.exponentialRampToValueAtTime(msg.accelerate, this.source.buffer.duration);
+		}
+
+
+		//Distortion Applied
+		if(msg.shape!=null){
+				//Distortion limited to [0,0.99)
+			if (Math.abs(msg.shape)>1) msg.shape=0.99;
+			else msg.shape=Math.abs(msg.shape);
+
+			temp = ac.createWaveShaper();
+
+			//@Change makeDistortion Curve?
+			temp.curve = makeDistortionCurve(msg.shape*300);
+			temp.oversample = '2x';
+
+			//Connect Distortion to last, and pass on 'last'
+			last.connect(temp);
+			last=temp;
+		}
+
+		//Start @....
+		// if(msg.begin!=0){
+		// 	console.log("buffer length:  " +this.source.buffer.length)
+		// 	var pcmData = new Float32Array(this.source.buffer.length);
+		// 	var offset = Math.trunc(this.source.buffer.length*msg.begin);
+
+		// 	this.source.buffer.copyFromChannel(pcmData,0,0);
+			
+		// 	console.log("offset: "+offset)
+
+		// 	var newChannelData = new Float32Array(offset)
+		// 	for (var i =0;i<offset;i++){
+		// 		newChannelData[i]=pcmData[i+offset];
+		// 	}
+		// 	var erase = new Float32Array(this.source.buffer.length)
+		// 	for(i in erase) i=0;
+		// 	this.source.buffer.copyToChannel(erase,0,0)
+
+		// 	this.source.buffer.copyToChannel(newChannelData,0,0);
+		//}
+
+		// //begin @makeup gain for messages with a late begin value?
+		// if (msg.begin!=0){
+		// 	//Set envelope to only make audio loud enough starting at the 'begin' proportion of the sample
+		// 	//playback
+		// 	var envelope = ac.createGain()
+		// 	envelope.gain.value=0;
+		// 	envelope.gain.setValueAtTime(1,msg.when+msg.begin*this.source.buffer.duration);
+			
+		// 	//Start the sample playback earlier to compensate for muted beginning portion.
+		// 	msg.when = msg.when-(msg.begin)*this.source.buffer.duration
+
+		// 	last.connect(envelope);
+		// 	last=envelope;
+
+		// };
+
+		// //End
+		// if (msg.end >0 && msg.end <1) {
+		// 	console.log("entered end")
+		// 	var envelope = ac.createGain();
+
+		// 	envelope.gain.setValueAtTime(0,msg.when+msg.end*this.source.buffer.duration)
+
+		// 	last.connect(envelope);
+		// 	last=envelope;
+		// }
+
+
+		//Reverse
+		// if(msg.speed<0){
+		// 	// var frames = this.source.buffer.length;
+		// 	// var pcmData = new Float32Array(frames);
+
+		// 	// this.source.buffer.copyFromChannel(pcmData,0,0);
+
+		// 	// var newChannelData = new Float32Array(frames);
+
+		// 	// for (var i =0;i<frames;i++){
+		// 	// 	newChannelData[i]=pcmData[frames-i];
+		// 	// }
+		// 	// // var erase = new Float32Array(this.source.buffer.length)
+		// 	// // for(i in erase) i=0;
+		// 	// // this.source.buffer.copyToChannel(erase,0,0)
+
+		// 	// this.source.buffer.copyToChannel(newChannelData,0,0);
+
+		// 	// //test = !test;
+		// 	this.source.buffer=revBuffer;
+
+		// }
+		// else{
+		// 	this.source.buffer=buffer;
+
+		// }
+
+		//Lowpass filtering @what to do with resonance, and what level/function to set frequency at?
+		if(msg.resonance>0 && msg.resonance<=1 && msg.cutoff>0 && msg.cutoff<=1){
+
+			temp = ac.createBiquadFilter();
+			temp.type = 'lowpass';
+			temp.frequency.value = msg.cutoff*14000;
+			temp.Q.value = 0.1;
+
+			last.connect(temp);
+			last = temp;
+
+
+		}
+
+		//hgihpass filtering @what to do with resonance, and what level/function to set frequency at?
+		if(msg.hresonance>0 && msg.hresonance<1 && msg.hcutoff>0 && msg.hcutoff<1){
+			temp = ac.createBiquadFilter();
+			temp.type = 'highpass';
+			temp.frequency.value = msg.hcutoff*10000;
+			temp.Q.value = 0.1;
+
+			last.connect(temp);
+			last = temp;
+		}
+
+		//Bandpass Filter
+		if(msg.bandf>0 && msg.bandf<1 && msg.bandq>0){
+			temp = ac.createBiquadFilter();
+			temp.type = 'bandpass';
+			temp.frequency.value = msg.bandf*10000;
+			temp.Q.value = msg.bandq;
+
+			last.connect(temp);
+			last = temp;
+		}
+
+
+
+		// if(msg.speed>=0){
+		// this.source.start(msg.when,msg.begin*this.source.buffer.duration,msg.end*this.source.buffer.duration);
+		// }
+		// else {
+		// 	this.revBuffer.start(msg.when,msg.begin*this.source.buffer.duration,msg.end*this.source.buffer.duration);
+		// 	this.revBuffer.connect(ac.destination);
+		// }
 		this.source.start(msg.when);
+
 	}
 
 	/* other plugins here */
@@ -185,3 +345,28 @@ function makeDistortionCurve(amount) {
 //crush and coarse - more difficutl
 //this.source.loop=true;
 //distortion - in webaudioapi..
+
+//Returns a new BufferSourceNode with the reversed channel data
+function reverseBuffer(buffer,ac){
+	var frames = buffer.length;
+	var pcmData = new Float32Array(frames);
+	var newBuffer = ac.createBuffer(buffer.numberOfChannels,buffer.length,ac.sampleRate);
+	var source = ac.createBufferSource();
+	buffer.copyFromChannel(pcmData,0,0);
+
+	var newChannelData = new Float32Array(frames);
+
+	for (var i =0;i<frames;i++){
+		newChannelData[i]=pcmData[frames-i];
+	}
+	newBuffer.copyToChannel(newChannelData,0,0);
+
+			// var erase = new Float32Array(this.source.buffer.length)
+			// for(i in erase) i=0;
+			// this.source.buffer.copyToChannel(erase,0,0)
+	source.buffer = newBuffer;
+	console.log(source.buffer);
+//	newBuffer.copyToChannel(newChannelData,0,0);
+
+	return source;
+}

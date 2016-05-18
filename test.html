@@ -36,7 +36,7 @@ WebDirt.prototype.testSampleBankGetsBuffer = function() {
 }
 
 WebDirt.prototype.testPlaybackOfSimpleMessage = function(){
-  var msg = { sample_name: 'cp', sample_n:0, when:this.ac.currentTime+0.5, speed: 1 };
+  var msg = { sample_name: 'cp', sample_n:0, when:this.ac.currentTime+0.5, speed: 1 ,shape:null, cutoff: 0.2, resonance: 0.1};
   this.queue(msg);
 }
 
@@ -44,9 +44,7 @@ WebDirt.prototype.testComplexMessage = function() {
   var msg = {};
   msg.sample_name = document.getElementById('sample_name').value;
   msg.sample_n = document.getElementById('sample_n').value;
-  console.log(msg.sample_name);
-  console.log(msg.sample_n);
-  /* msg.speed = document.getElementById('speed').value;
+  msg.speed = document.getElementById('speed').value;
   msg.cutoff = document.getElementById('cutoff').value;
   msg.resonance = document.getElementById('resonance').value;
   msg.accelerate = document.getElementById('accelerate').value;
@@ -54,8 +52,11 @@ WebDirt.prototype.testComplexMessage = function() {
   msg.hcutoff = document.getElementById('hcutoff').value;
   msg.hresonance = document.getElementById('hresonance').value;
   msg.bandf = document.getElementById('bandf').value;
-  msg.bandq = document.getElementById('bandq').value; */
+  msg.bandq = document.getElementById('bandq').value;
   msg.when = this.ac.currentTime+0.5;
+  var string
+  msg.cutoff= document.getElementById('cutoff').value;
+  msg.resonance=0.1;
   this.queue(msg);
 }
 
@@ -78,7 +79,6 @@ WebDirt.prototype.testComplexMessage = function() {
     <div>hresonance: <textarea id="hresonance"></textarea></div>
     <div>bandf: <textarea id="bandf"></textarea></div>
     <div>bandq: <textarea id="bandq"></textarea></div>
-
     <button onclick="webDirt.testComplexMessage()">testComplexMessage</button>
   </div>
   <button onclick="webDirt.subscribeToTidalSocket(true)">subscribeToTidalSocket</button>
