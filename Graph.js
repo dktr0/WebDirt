@@ -32,12 +32,10 @@ function Graph(msg,ac,sampleBank){
 	}
 	else { // buffer is currently available
 
-		//Sample reverse
+		// Speed and Sample reverse
+		if(typeof msg.speed != 'number') msg.speed = 1;
 		if(msg.speed>=0) this.source.buffer = buffer;
 		else this.source = last =reverseBuffer(buffer,ac);
-
-		//Speed
-		if(typeof msg.speed != 'number') msg.speed = 1;
 		this.source.playbackRate.value=Math.abs(msg.speed);
 
 		if(typeof msg.accelerate != 'number') msg.accelerate = 0;
