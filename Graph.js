@@ -1,18 +1,28 @@
 
-
-
-
-
-
-
 function Graph(msg,ac,sampleBank){
 	var last;
-	this.source = ac.createBufferSource();
-	this.source.buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
-	if(this.source.buffer==null) throw Error("Unable to get buffer for " + msg.sample_name + ":" + msg.sample_n);
-	if(msg.speed!=0) this.source.playbackRate.value=msg.speed;
-	last = this.source;
-	this.source.start(msg.when);
+	this.source = last = ac.createBufferSource();
+	var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
+	if(buffer == null) { // buffer not available but may be available soon
+		var closure = this;
+		var reattemptDelay = (msg.when-ac.currentTime-0.2)*1000;
+		setTimeout(function(){
+			var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
+			if(buffer != null) {
+				closure.source.buffer = buffer;
+				if(msg.speed != null) closure.source.playbackRate.value=msg.speed;
+				closure.source.start(msg.when);
+			} else {
+				console.log("unable to access sample " + msg.sample_name + ":" + msg.sample_n + " on second attempt");
+				// closure.cleanup();
+			}
+		},reattemptDelay);
+	}
+	else { // buffer is currently available
+		this.source.buffer = buffer;
+		if(msg.speed != null) this.source.playbackRate.value=msg.speed;
+		this.source.start(msg.when);
+	}
 
 	/* other plugins here */
 
