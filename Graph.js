@@ -8,61 +8,60 @@ var vowels={
 };
 
 function Graph(msg,ac,sampleBank){
-	var last;
-	this.source = last = ac.createBufferSource();
-	var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
-	//this.revBuffer = reverseBuffer(buffer,ac);
-	var channelMerger = ac.createChannelMerger(2);
+	this.ac = ac;
+	var last,temp;
 
-	var temp;
-	if(buffer == null) { // buffer not available but may be available soon
+	// get basic buffer player, including speed change and sample reversal
+	this.source = last = ac.createBufferSource();
+	if(typeof msg.begin != 'number') msg.begin = 0;
+	if(typeof msg.end != 'number') msg.end = 1;
+	this.begin = msg.begin;
+	this.end = msg.end;
+	var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
+	if(isNaN(parseInt(msg.speed))) msg.speed = 1;
+	if(msg.speed>=0 && buffer != null) this.source.buffer = buffer;
+	if(msg.speed<0 && buffer != null) this.source.buffer = reverseBuffer(buffer,ac);
+	console.log(msg.speed);
+	this.source.playbackRate.value=Math.abs(msg.speed);
+	if(buffer != null) this.start();
+	else { // buffer not available but may be available soon
 		var closure = this;
 		var reattemptDelay = (msg.when-ac.currentTime-0.2)*1000;
 		setTimeout(function(){
 			var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
 			if(buffer != null) {
 				closure.source.buffer = buffer;
-				if(msg.speed != null) closure.source.playbackRate.value=msg.speed;
-				closure.source.start(msg.when);
-			} else {
-				console.log("unable to access sample " + msg.sample_name + ":" + msg.sample_n + " on second attempt");
-				// closure.cleanup();
+				closure.start();
 			}
+		  else console.log("unable to access sample " + msg.sample_name + ":" + msg.sample_n + " on second attempt");
 		},reattemptDelay);
 	}
-	else { // buffer is currently available
 
-		// Speed and Sample reverse
-		if(typeof msg.speed != 'number') msg.speed = 1;
-		if(msg.speed>=0) this.source.buffer = buffer;
-		else this.source = last =reverseBuffer(buffer,ac);
-		this.source.playbackRate.value=Math.abs(msg.speed);
+	// accelerate
+	if(isNaN(parseInt(msg.accelerate))) msg.accelerate = 0;
+	if(msg.accelerate!=0){
+		this.source.playbackRate.exponentialRampToValueAtTime(msg.accelerate, this.source.buffer.duration);
+	}
 
-		if(typeof msg.accelerate != 'number') msg.accelerate = 0;
-		if(msg.accelerate!=0){
-			this.source.playbackRate.exponentialRampToValueAtTime(msg.accelerate, this.source.buffer.duration);
-		}
+	// Distortion
+	if(isNaN(parseInt(msg.shape))) msg.shape = 0;
+	if(msg.shape!=0) {
+		//Distortion limited to [0,0.99)
+		if (Math.abs(msg.shape)>1) msg.shape=0.99;
+		else msg.shape=Math.abs(msg.shape);
+		temp = ac.createWaveShaper();
 
-		//Distortion Applied
-		if(typeof msg.shape != 'number') msg.shape = 0;
-		if(msg.shape!=0){
-				//Distortion limited to [0,0.99)
-			if (Math.abs(msg.shape)>1) msg.shape=0.99;
-			else msg.shape=Math.abs(msg.shape);
+		//@Change makeDistortion Curve?
+		temp.curve = makeDistortionCurve(msg.shape*300);
+		temp.oversample = '2x';
 
-			temp = ac.createWaveShaper();
+		//Connect Distortion to last, and pass on 'last'
+		last.connect(temp);
+		last=temp;
+	}
 
-			//@Change makeDistortion Curve?
-			temp.curve = makeDistortionCurve(msg.shape*300);
-			temp.oversample = '2x';
-
-			//Connect Distortion to last, and pass on 'last'
-			last.connect(temp);
-			last=temp;
-		}
-
-		//Lowpass filtering @what level/function to set frequency and resonant gain at?
-		if(msg.resonance>0 && msg.resonance<=1 && msg.cutoff>0 && msg.cutoff<=1){
+	//Lowpass filtering @what level/function to set frequency and resonant gain at?
+	if(msg.resonance>0 && msg.resonance<=1 && msg.cutoff>0 && msg.cutoff<=1){
 
 			temp = ac.createBiquadFilter();
 			temp.type = 'lowpass';
@@ -72,17 +71,17 @@ function Graph(msg,ac,sampleBank){
 			last.connect(temp);
 			last = temp;
 
-			temp = ac.createBiquadFilter()
+			temp = ac.createBiquadFilter();
 			temp.type = 'peaking';
 			temp.frequency.value = msg.cutoff*1400+100;
 			temp.Q.value=70;
 			temp.gain.value = msg.resonance*10;
 			last.connect(temp);
 			last = temp;
-		}
+	}
 
-		//higpass filtering @what to do with resonance, and what level/function to set frequency at?
-		if(msg.hresonance>0 && msg.hresonance<1 && msg.hcutoff>0 && msg.hcutoff<1){
+	//higpass filtering @what to do with resonance, and what level/function to set frequency at?
+	if(msg.hresonance>0 && msg.hresonance<1 && msg.hcutoff>0 && msg.hcutoff<1){
 			temp = ac.createBiquadFilter();
 			temp.type = 'highpass';
 			temp.frequency.value = msg.hcutoff*10000;
@@ -90,10 +89,10 @@ function Graph(msg,ac,sampleBank){
 
 			last.connect(temp);
 			last = temp;
-		}
+	}
 
-		//Bandpass Filter
-		if(msg.bandf>0 && msg.bandf<1 && msg.bandq>0){
+	//Bandpass Filter
+	if(msg.bandf>0 && msg.bandf<1 && msg.bandq>0){
 			temp = ac.createBiquadFilter();
 			temp.type = 'bandpass';
 			temp.frequency.value = msg.bandf*10000;
@@ -101,10 +100,10 @@ function Graph(msg,ac,sampleBank){
 
 			last.connect(temp);
 			last = temp;
-		}
+	}
 
 		//Vowel
-		if (msg.vowel=='a'||msg.vowel=='e'||msg.vowel=='i'||msg.vowel=='o'||msg.vowel=='u'){
+	if (msg.vowel=='a'||msg.vowel=='e'||msg.vowel=='i'||msg.vowel=='o'||msg.vowel=='u'){
 			var frequencies;
 			var q = [5/20,20/20,50/20];
 			var gains = [1,1,1,0.177,0.354]
@@ -143,117 +142,88 @@ function Graph(msg,ac,sampleBank){
 			temp.gain.value=20;
 			last.connect(temp);
 			last=temp;
-		}
-
-		//Samle_loop
-		if (msg.sample_loop>0){
-			last.loop=true;
-			console.log(last.loop)
-			last.connect(ac.destination)
-			this.source.start(0)
-			return
-		}
-
-
-		if(typeof msg.coarse != 'number') msg.coarse = 1;
-		msg.coarse=Math.abs(msg.coarse);
-		console.log(msg.coarse)
-		if(msg.coarse>1){
-
-			this.source = last = decimate(this.source.buffer,msg.coarse,ac);
-
-
-			// var newAc= new AudioContext();
-			// newAc.sampleRate=ac.sampleRate/msg.coarse;
-			// last.connect(newAc.destination);
-			// last.start(0)
-
-
-			// //@
-			// var offlineAc = new OfflineAudioContext(OUTPUT_CHANNELS,this.source.buffer.length,this.source.buffer.sampleRate/msg.coarse)
-			// var resampledBuffer = offlineAc.createBuffer(this.source.buffer.numberOfChannels,this.source.buffer.length,ac.sampleRate);
-			// var bufferData = new Float32Array(this.source.buffer.length);
-			// this.source.buffer.copyFromChannel(bufferData,0,0);
-			// offlineAc.startRendering();
-
-			// this.source = offlineAc.createBufferSource();
-			// resampledBuffer.copyToChannel(bufferData,0,0);
-
-			// this.source.buffer = resampledBuffer;
-			// this.source.connect(offlineAc.destination);
-
-			// this.source.start(0);
-
-			// return
-
-
-
-		}
-
-
-		//Crush
-		if (msg.crush>=1){
-			this.source = last = crush(this.source.buffer, msg.crush, ac)
-		}
-
-		//Gain
-		var gain = ac.createGain()
-		if(msg.gain!=null) gain.gain.value= Math.abs(msg.gain);
-		else gain.gain.value =1;
-
-		if(typeof msg.delay != 'number') msg.delay = 0;
-		msg.delay=Math.abs(msg.delay);
-		//Delay
-		if(msg.delay!=0){
-			var delay = ac.createDelay();
-			delay.delayTime.value = msg.delaytime;
-			var delayGain = ac.createGain();
-			var feedBackGain = ac.createGain();
-			feedBackGain.gain.value= msg.delayfeedback;
-			delayGain.gain.value = msg.delay;
-			last.connect(gain);
-			last.connect(delay);
-			delay.connect(delayGain);
-			delayGain.connect(last);
-			delay.connect(feedBackGain);
-			feedBackGain.connect(delay);
-		}
-		else
-			last.connect(gain);
-
-		//	last = temp;
-
-		if(typeof msg.begin != 'number') msg.begin = 0;
-		if(typeof msg.end != 'number') msg.end = 1;
-		this.source.start(msg.when,msg.begin*this.source.buffer.duration,msg.end*this.source.buffer.duration);
-
 	}
+
+	//Samle_loop
+
+	/* if (msg.sample_loop>0){
+		last.loop=true;
+		console.log(last.loop)
+		last.connect(ac.destination)
+		this.source.start(0)
+		return
+	} */
+
+
+	if(isNaN(parseInt(msg.coarse))) msg.coarse = 1;
+	msg.coarse=Math.abs(msg.coarse);
+	if(msg.coarse>1){
+		last = decimate(this.source.buffer,msg.coarse,ac);
+	}
+
+	//Crush
+	if(isNaN(parseInt(msg.crush))) msg.crush = null;
+	if (msg.crush != null){
+		last = crush(this.source.buffer, msg.crush, ac)
+	}
+
+	// Delay
+	last = delay(last,msg.delay,msg.delaytime,msg.delayfeedback);
+
+	//Gain
+	if(isNaN(parseInt(msg.gain))) msg.gain = 1;
+	var gain = ac.createGain();
+	// @this should be as per Dirt's mapping...
+	gain.gain.value = Math.abs(msg.gain);
+	last.connect(gain);
+	last = gain;
 
 
 	//Panning (currently stereo)
-//	var channelMerger = ac.createChannelMerger(2);
-	// channelMerger.channelCount = 1;
-	// channelMerger.channelCountMode = "explicit";
-	// channelMerger.channelInterpretation = "discrete";
-
-	channelMerger.connect(ac.destination);
+	if(isNaN(parseInt(msg.pan))) msg.pan = 0.5;
 	var gain1 = ac.createGain();
 	var gain2 = ac.createGain();
-
-	if(typeof msg.pan != 'number') msg.pan = 0.5;
 	gain1.gain.value=1-msg.pan;
-	gain.connect(gain1);
-	gain1.connect(channelMerger,0,0);
 	gain2.gain.value=msg.pan;
-	gain.connect(gain2);
+	// @should do equal power panning or something like that instead, i.e. +3 dB as becomes centre-panned
+	last.connect(gain1);
+	last.connect(gain2);
+	var channelMerger = ac.createChannelMerger(2);
+	gain1.connect(channelMerger,0,0);
 	gain2.connect(channelMerger,0,1);
-
-
-
-
-	//last.connect(ac.destination);
+	channelMerger.connect(ac.destination);
 }
 
+Graph.prototype.start = function() {
+	this.source.start(this.when,this.begin*this.source.buffer.duration,this.end*this.source.buffer.duration);
+}
+
+
+function delay(input,outputGain,delayTime,delayFeedback) {
+	if(isNaN(parseInt(outputGain))) outputGain = 0;
+	outputGain = Math.abs(outputGain);
+	if(outputGain!=0){
+		var delayNode = ac.createDelay();
+		if(isNaN(parseInt(delayTime))) {
+			console.log("warning: delaytime not a number, using default of 1");
+			delayTime = 1;
+		}
+		delayNode.delayTime.value = delayTime;
+		var feedBackGain = ac.createGain();
+		if(isNaN(parseInt(delayFeedback))) {
+			console.log("warning: delayfeedback not a number, using default of 0.5");
+			delayFeedback = 0.5;
+		}
+		feedBackGain.gain.value= delayFeedback;
+		var delayGain = ac.createGain();
+		delayGain.gain.value = outputGain;
+		input.connect(delayNode);
+		delayNode.connect(feedBackGain);
+		delayNode.connect(delayGain);
+		feedbackGain.connect(delayNode);
+		return delayGain;
+	} else return input;
+}
 
 //Borrowed from documentation @may want to redo/make differently
 function makeDistortionCurve(amount) {
@@ -309,14 +279,6 @@ function crush(buffer, crush, ac){
 	return source;
 }
 
-
-//script processor node -- inefficient..
-//pan - gain per channel
-//accelerate - playback.(envelope of some kind)
-//crush and coarse - more difficutl
-//this.source.loop=true;
-//distortion - in webaudioapi..
-
 //Returns a new BufferSourceNode containing a buffer with the reversed frames of the
 //parameter 'buffer'
 //@add add more for multi-channel samples
@@ -324,7 +286,7 @@ function reverseBuffer(buffer,ac){
 	var frames = buffer.length;
 	var pcmData = new Float32Array(frames);
 	var newBuffer = ac.createBuffer(buffer.numberOfChannels,buffer.length,ac.sampleRate);
-	var source = ac.createBufferSource();
+	// var source = ac.createBufferSource();
 	var newChannelData = new Float32Array(frames);
 
 	buffer.copyFromChannel(pcmData,0,0);
@@ -335,9 +297,11 @@ function reverseBuffer(buffer,ac){
 	//set to send element to get rid of clipping
 	newChannelData[0]=newChannelData[1];
 	newBuffer.copyToChannel(newChannelData,0,0);
-	source.buffer = newBuffer;
 
-	return source;
+	return newBuffer;
+
+//	source.buffer = newBuffer;
+//	return source;
 }
 
 //Returns BufferSourceNode with a sped up buffer. Volume of samples given a high speed parameter (>~4) is
@@ -383,140 +347,3 @@ function decimate(buffer,rate,ac){
 	newsource.buffer = newBuffer;
 	return newsource;
  }
-
-
-
-
-
-
-	// this.shape = webDirt.createWaveShaper();
-	// //400 chosen arbitrarily?
-	// this.shape.curve.value = makeDistortionCurve(400);
-
-	// this.source.connect(this.shape);
-
-
-
-// 	console.log(this.source.buffer.numberOfChannels);
-// 	console.log(this.source.buffer.getChannelData(0).length);
-
-// 	var array = new Float32Array;
-
-// 	array = this.source.buffer.getChannelData(0);
-// 	//this.source.buffer.copyFromChannel(array,0,0);
-
-
-// 	// array =this.source.buffer.getChannelData(0);
-// 	var i = 0;
-// 	while (i<array.length){
-
-// 		if (i%2==0)
-// 			array[i]==array[i]
-// 		else array[i]=0;
-// 	i++;
-// 	}
-
-// 	console.log(array)
-
-
-
-// 	console.log(array[0] +", " + array.length);
-// 	this.source.buffer = array;
-// //	this.source.buffer.copyToChannel(array,0,0);
-
-
-
-
-//timeout for when
-
-
-
-
-	// if(msg.begin>1 || msg.begin <0)
-	// 		this.begin =0;
-	// else
-	// 	this.begin=msg.begin;
-
-	// if(msg.end>1 || msg.end <0){
-	// 	this.end =1;
-	// }
-
-	// if(msg.speed<0){
-	// 	this.speed = abs(msg.speed);
-	// 	this.reverse= true;
-	// }
-	// else{
-	// 	this.speed=msg.speed
-	// 	this.reverse = false;
-	// }
-
-	// if(abs(msg.pan)>1){
-	// 	this.pan=1
-	// }
-	// else{
-	// 	this.pan= abs(msg.pan)
-	// }
-
-	// //LPF Parameters
-	// //Defaults to no filtering if value outside [0,1] is given.
-	// if(msg.cutoff<0 ||msg.cutoff>1){
-	// 	this.cutoff=1;
-	// }
-	// else {
-	// 	this.cutoff=msg.cutoff;
-	// }
-
-	// if(msg.resonance<0 || msg.resonance>1){
-	// 	this.resonance=1;
-	// }
-	// else {
-	// 	this.resonance=msg.resonance;
-	// }
-
-	// //Accelerate
-	// this.accelerate=msg.accelerate;
-
-	// //Distortion limited to [0,0.99)
-	// if (abs(distortion)>1) this.distortion =0.99;
-	// else this.distortion=abs(msg.distortion);
-
-	// //gain
-	// this.gain = abs(msg.gain);
-
-	// //cut
-	// if (msg.cut>0) this.cut = 1;
-	// else if (msg.cut<0) this.cut = -1;
-	// else this.cut = 0;
-
-	// //Delay
-	// if (abs(msg.delay)>1) this.delay=1;
-	// else this.delay = abs(msg.delay);
-	// if(msg.delayTime>0) this.delayTime= msg.delayTime;
-	// else this.delayTime= -1;
-	// if (msg.delayFeedback>1) this.delayFeedback=1;
-	// else if (msg.delayFeedback<0) this.delayFeedback = 0; //
-	// else this.delayFeedback=msg.delayFeedback;
-
-	// //Coarse
-	// this.coarse = abs(msg.coarse);
-
-	// //HPF Parameters
-	// //Defaults to no filtering if value outside [0,1] is given.
-	// if(msg.hcutoff<0 ||msg.hcutoff>1){
-	// 	this.hcutoff=0;
-	// }
-	// else {
-	// 	this.cutoff=msg.cutoff;
-	// }
-
-	// if(msg.hresonance<0 || msg.hresonance>1){
-	// 	this.hresonance=1;
-	// }
-	// else {
-	// 	this.hresonance=msg.hresonance;
-	// }
-
-	// //Band Pass Filter
-	// if (abs(msg.bandf))
-
-	// this.bandf=abs(msg.bandf)

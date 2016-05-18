@@ -36,7 +36,7 @@ WebDirt.prototype.testSampleBankGetsBuffer = function() {
 }
 
 WebDirt.prototype.testPlaybackOfSimpleMessage = function(){
-  var msg = { sample_name: 'cp', sample_n:0, when:this.ac.currentTime+0.5, speed: 1 ,shape:null, cutoff: 0.2, resonance: 0.1};
+  var msg = { sample_name: 'cp', sample_n:0, when:this.ac.currentTime+0.5 };
   this.queue(msg);
 }
 
@@ -47,6 +47,7 @@ WebDirt.prototype.testComplexMessage = function() {
   msg.sample_name = document.getElementById('sample_name').value;
   msg.sample_n = document.getElementById('sample_n').value;
   msg.speed = document.getElementById('speed').value;
+  console.log("msg.speed in test.html is " + msg.speed);
   msg.cutoff = document.getElementById('cutoff').value;
   msg.resonance = document.getElementById('resonance').value;
   msg.accelerate = document.getElementById('accelerate').value;
@@ -55,9 +56,12 @@ WebDirt.prototype.testComplexMessage = function() {
   msg.hresonance = document.getElementById('hresonance').value;
   msg.bandf = document.getElementById('bandf').value;
   msg.bandq = document.getElementById('bandq').value;
+  msg.vowel = document.getElementById('vowel').value;
+  msg.coarse = document.getElementById('coarse').value;
+  msg.crush = document.getElementById('crush').value;
+  msg.pan = document.getElementById('pan').value;
+  msg.gain = document.getElementById('gain').value;
   msg.when = this.ac.currentTime+0.5;
-  msg.cutoff= document.getElementById('cutoff').value;
-  msg.resonance=0.1;
   this.queue(msg);
 }
 
@@ -69,7 +73,7 @@ WebDirt.prototype.testComplexMessage = function() {
   <button onclick="webDirt.testSampleBankGetsBuffer()">testSampleBankGetsBuffer</button>
   <button onclick="webDirt.testPlaybackOfSimpleMessage()">testPlaybackOfSimpleMessage</button>
   <div border="1px solid black">
-    <div>sample_name: <textarea id="sample_name"></textarea></div>
+    <div>sample_name: <textarea id="sample_name" rows="1"></textarea></div>
     <div>sample_n: <textarea id="sample_n"></textarea></div>
     <div>speed: <textarea id="speed"></textarea></div>
     <div>cutoff: <textarea id="cutoff"></textarea></div>
@@ -80,6 +84,12 @@ WebDirt.prototype.testComplexMessage = function() {
     <div>hresonance: <textarea id="hresonance"></textarea></div>
     <div>bandf: <textarea id="bandf"></textarea></div>
     <div>bandq: <textarea id="bandq"></textarea></div>
+    <div>vowel: <textarea id="vowel"></textarea></div>
+    <div>coarse: <textarea id="coarse"></textarea></div>
+    <div>crush: <textarea id="crush"></textarea></div>
+    <div>pan: <textarea id="pan"></textarea></div>
+    <div>gain: <textarea id="gain"></textarea></div>
+
     <button onclick="webDirt.testComplexMessage()">testComplexMessage</button>
   </div>
   <button onclick="webDirt.subscribeToTidalSocket(true)">subscribeToTidalSocket</button>
