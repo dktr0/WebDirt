@@ -20,8 +20,7 @@ function Graph(msg,ac,sampleBank){
 	var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
 	if(isNaN(parseInt(msg.speed))) msg.speed = 1;
 	if(msg.speed>=0 && buffer != null) this.source.buffer = buffer;
-	if(msg.speed<0 && buffer != null) this.source.buffer = reverseBuffer(buffer,ac);
-	console.log(msg.speed);
+	if(msg.speed<0 && buffer != null) {this.source.buffer=buffer; last = reverse(last,ac)};
 	this.source.playbackRate.value=Math.abs(msg.speed);
 	if(buffer != null) this.start();
 	else { // buffer not available but may be available soon
@@ -47,7 +46,6 @@ function Graph(msg,ac,sampleBank){
 	// //if(isNaN(parseInt(msg.shape))) msg.shape = 0;
 	last = shape(last, msg.shape, ac);
 
-
 	//Lowpass filtering @what level/function to set frequency and resonant gain at?
 	last = lowPassFilter(last, msg.cutoff, msg.resonance, ac);
 
@@ -59,6 +57,9 @@ function Graph(msg,ac,sampleBank){
 
 	last = vowel(last, msg.vowel, ac);
 
+	// Delay
+	last = delay(last,msg.delay,msg.delaytime,msg.delayfeedback);
+
 	//Samle_loop
 	/* if (msg.sample_loop>0){
 		last.loop=true;
@@ -69,29 +70,62 @@ function Graph(msg,ac,sampleBank){
 	} */
 
 
+	/*For testing otherCoarse (leave here for now)
+	last = otherCoarse(last, msg.coarse, ac);
+	var crushNode=last;*/
+
+	//Coarse
+	//Safety and msg parsing
 	if(isNaN(parseInt(msg.coarse))) msg.coarse = 1;
 	msg.coarse=Math.abs(msg.coarse);
+
+	var coarseNode;
+	//If coarse is valid, coarseNode becomes last with coarseNode effect
+	//otherwise, coarseNode becomes last 		
 	if(msg.coarse>1){
-		last = decimate(this.source.buffer,msg.coarse,ac);
+		//New script processor node	
+		coarseNode = coarse(msg.coarse, ac)
+		last.connect(coarseNode);
 	}
+	else coarseNode = last;
+	//When last is done playing, disconnects last from coarseNode
+	//this is necessary or the processor node's (coarseNode's) handler
+	//function will infinitely be invoked
+	last.onended=function(){
+		last.disconnect(coarseNode)
+		coarseNode.disconnect()
+	}
+
+
 
 	//Crush
 	if(isNaN(parseInt(msg.crush))) msg.crush = null;
-	if (msg.crush != null){
-		console.log("crush is: "+msg.crush)
-		last = crush(this.source.buffer, msg.crush, ac)
+	else msg.crush=Math.abs(msg.crush)
+	var crushNode;
+
+	if(msg.crush!=null && msg.crush>0){
+		console.log("hello")
+		crushNode=crush(msg.crush, ac)
+		coarseNode.connect(crushNode);
+	}
+	else crushNode = coarseNode;
+
+	coarseNode.onended = function(){
+		coarseNode.disconnect(crushNode)
+		crushNode.disconnect();
 	}
 
-	// Delay
-	last = delay(last,msg.delay,msg.delaytime,msg.delayfeedback);
+
+
+
 
 	//Gain
 	if(isNaN(parseInt(msg.gain))) msg.gain = 1;
 	var gain = ac.createGain();
 	// @this should be as per Dirt's mapping...
 	gain.gain.value = Math.abs(msg.gain);
-	last.connect(gain);
-	last = gain;
+	crushNode.connect(gain);
+	var last1 = gain;
 
 
 	//Panning (currently stereo)
@@ -101,13 +135,123 @@ function Graph(msg,ac,sampleBank){
 	gain1.gain.value=1-msg.pan;
 	gain2.gain.value=msg.pan;
 	// @should do equal power panning or something like that instead, i.e. +3 dB as becomes centre-panned
-	last.connect(gain1);
-	last.connect(gain2);
+	last1.connect(gain1);
+	last1.connect(gain2);
 	var channelMerger = ac.createChannelMerger(2);
 	gain1.connect(channelMerger,0,0);
 	gain2.connect(channelMerger,0,1);
 	channelMerger.connect(ac.destination);
+
 }
+
+
+//Coarse
+//Returns a scriptNode that will create a fake-resampling effect when .connected to another node.
+//Note: is important to disconnect what is returned by this function once a sample has finished playing
+//otherwise the onaudioprocess function will be called infinitely.
+function coarse (coarse, ac){
+	var scriptNode = ac.createScriptProcessor();
+	scriptNode.onaudioprocess = function(audioProcessingEvent){
+		var inputBuffer = audioProcessingEvent.inputBuffer;	
+		var outputBuffer = audioProcessingEvent.outputBuffer;
+		for (var channel=0;channel<outputBuffer.numberOfChannels; channel++){
+			var inputData = inputBuffer.getChannelData(channel);
+			var outputData = outputBuffer.getChannelData(channel);
+			for(var frame=0; frame<inputBuffer.length; frame++){
+
+				 if(frame%coarse==0) outputData[frame]=inputData[frame];
+				else outputData[frame]=outputData[frame-1];				
+			}
+		}
+		console.log("hello")
+		//return outputBuffer
+	}//end scriptNode audio processing handler 
+	
+	return scriptNode;
+}
+
+
+
+//@ is the scriptNode handler continuously called even after it has finished playing?
+//how to stop that?
+function reverse (input, ac){
+
+	
+	var scriptNode = ac.createScriptProcessor();
+
+	input.connect(scriptNode);
+
+	scriptNode.onaudioprocess = function(audioProcessingEvent){
+		var inputBuffer = audioProcessingEvent.inputBuffer;
+	
+		var outputBuffer = audioProcessingEvent.outputBuffer;
+
+		for (var channel=0;channel<outputBuffer.numberOfChannels; channel++){
+			var inputData = inputBuffer.getChannelData(channel);
+			var outputData = outputBuffer.getChannelData(channel);
+			for(var frame=0; frame<inputBuffer.length; frame++){
+				outputData[frame]= inputData[inputBuffer.length-frame];
+			}//Frames
+		}//Channels
+		//return outputBuffer
+		console.log("input: ");
+		console.log(inputData)
+		console.log("output: ")
+		console.log(outputData);
+	}//end scriptNode audio processing handler 
+
+	return scriptNode;
+}
+
+
+//@ is the scriptNode handler continuously called even after it has finished playing?
+//how to stop that?
+function crush (crush, ac){
+
+	var scriptNode = ac.createScriptProcessor();
+
+	//scriptNode Processing Handler
+	scriptNode.onaudioprocess = function(audioProcessingEvent){
+		var inputBuffer = audioProcessingEvent.inputBuffer;
+		var outputBuffer = audioProcessingEvent.outputBuffer;
+		for (var channel=0;channel<outputBuffer.numberOfChannels; channel++){
+			var inputData = inputBuffer.getChannelData(channel);
+			var outputData = outputBuffer.getChannelData(channel);
+			for(var frame=0; frame<inputBuffer.length; frame++){
+
+				outputData[frame]=Math.round(inputData[frame]*Math.pow(2,(crush-1)))/Math.pow(2,(crush-1));
+			}//Frames
+		}//Channels
+	}//end scriptNode audio processing handler 
+	return scriptNode;
+
+}//End Crush
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 Graph.prototype.start = function() {
 	console.log("start")
@@ -156,26 +300,6 @@ function makeDistortionCurve(amount) {
   return curve;
 };
 
-
-/*
-function formants(input,vowel) {
-	if(typeof vowel != 'string') vowel = null;
-	if(vowel != null) {
-
-		filter.connect(input);
-		return filter;
-	} else return input;
-}
-
-var last;
-
-last = formants(last,msg.vowel);
-last = crush(last,msg.crush);
-last = ...
-*/
-
-
-
 function bandPassFilter(input, bandf, bandq, ac){
 	//Bandpass Filter
 	if(bandf>0 && bandf<1 && bandq>0){
@@ -189,27 +313,6 @@ function bandPassFilter(input, bandf, bandq, ac){
 	}
 	else return input;
 }
-
-//returns a buffer source with a buffer with bit resolution degraded
-//by 'crush'
-function crush(buffer, crush, ac){
-	var frames = buffer.length;
-	var pcmData = new Float32Array(frames);
-	var newBuffer = ac.createBuffer(buffer.numberOfChannels,buffer.length,ac.sampleRate);
-	var source = ac.createBufferSource();
-	var newChannelData = new Float32Array(frames);
-	buffer.copyFromChannel(pcmData,0,0);
-
-	for (var i =0;i<frames;i++){
-		newChannelData[i]=Math.round(pcmData[i]*Math.pow(2,(crush-1)))/Math.pow(2,(crush-1));
-	}
-	console.log(newChannelData)
-	newBuffer.copyToChannel(newChannelData,0,0);
-	source.buffer = newBuffer;
-
-	return source;
-}
-
 
 function highPassFilter (input, hcutoff, hresonance, ac){
 	
@@ -328,29 +431,6 @@ function speed(buffer,rate,ac){
 
 }
 
-//Used for coarse effect
-function decimate(buffer,rate,ac){
-	var frames = buffer.length;
-	var pcmData = new Float32Array(frames);
-	var newBuffer = ac.createBuffer(buffer.numberOfChannels,buffer.length,ac.sampleRate);
-	var newsource = ac.createBufferSource();
-	var newChannelData = new Float32Array(newBuffer.length);
-	buffer.copyFromChannel(pcmData,0,0);
-
-	for(var i=0; i<newBuffer.length; i++){
-		if(i%rate==0){
-		newChannelData[i]=pcmData[i];
-		}
-		else{
-		newChannelData[i]=newChannelData[i-1];
-		}
-
-	}
-	newBuffer.copyToChannel(newChannelData,0,0);
-	newsource.buffer = newBuffer;
-	return newsource;
- }
-
 //Vowel effect
 //@ get frequencies from superdirt
 function vowel (input, vowel, ac){
@@ -392,4 +472,109 @@ function vowel (input, vowel, ac){
 	}
 	else return input
 }
+
+
+
+
+
+
+/* Some older functions for effects, may want to refer back to them eventually
+
+
+
+//@ is the scriptNode handler continuously called even after it has finished playing?
+//how to stop that?
+function otherCoarse (input, coarse, ac){
+	//Safety and msg parsing
+	if(isNaN(parseInt(coarse))) coarse = 1;
+	coarse=Math.abs(coarse);
+
+	var coarseNode;
+	//If coarse is valid, coarseNode becomes last with coarseNode effect
+	//otherwise, coarseNode becomes last 		
+	if(coarse>1){
+	var scriptNode = ac.createScriptProcessor();
+	scriptNode.onaudioprocess = function(audioProcessingEvent){
+		var inputBuffer = audioProcessingEvent.inputBuffer;
+	
+		var outputBuffer = audioProcessingEvent.outputBuffer;
+
+		for (var channel=0;channel<outputBuffer.numberOfChannels; channel++){
+			var inputData = inputBuffer.getChannelData(channel);
+			var outputData = outputBuffer.getChannelData(channel);
+			for(var frame=0; frame<inputBuffer.length; frame++){
+				if(frame%coarse==0) outputData[frame]=inputData[frame];
+				else outputData[frame]=outputData[frame-1];	
+			}//Frames
+		}//Channels
+		console.log("infinite loop in otherCoarse, scriptNode handler")
+	}//end scriptNode audio processing handler 
+
+	input.connect(scriptNode);
+	input.onended= function(){input.disconnect(scriptNode)};
+	return scriptNode;
+	}
+	else 
+		return input
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//Used for coarse effect
+function decimate(buffer,rate,ac){
+	var frames = buffer.length;
+	var pcmData = new Float32Array(frames);
+	var newBuffer = ac.createBuffer(buffer.numberOfChannels,buffer.length,ac.sampleRate);
+	var newsource = ac.createBufferSource();
+	var newChannelData = new Float32Array(newBuffer.length);
+	buffer.copyFromChannel(pcmData,0,0);
+
+	for(var i=0; i<newBuffer.length; i++){
+		if(i%rate==0){
+		newChannelData[i]=pcmData[i];
+		}
+		else{
+		newChannelData[i]=newChannelData[i-1];
+		}
+
+	}
+	newBuffer.copyToChannel(newChannelData,0,0);
+	newsource.buffer = newBuffer;
+	return newsource;
+ }
+
+// returns a buffer source with a buffer with bit resolution degraded
+// by 'crush'
+function crush(buffer, crush, ac){
+	var frames = buffer.length;
+	var pcmData = new Float32Array(frames);
+	var newBuffer = ac.createBuffer(buffer.numberOfChannels,buffer.length,ac.sampleRate);
+	var source = ac.createBufferSource();
+	var newChannelData = new Float32Array(frames);
+	buffer.copyFromChannel(pcmData,0,0);
+
+	for (var i =0;i<frames;i++){
+		newChannelData[i]=Math.round(pcmData[i]*Math.pow(2,(crush-1)))/Math.pow(2,(crush-1));
+	}
+	console.log(newChannelData)
+	newBuffer.copyToChannel(newChannelData,0,0);
+	source.buffer = newBuffer;
+
+	return source;
+}
+
+
+
+*/
 
