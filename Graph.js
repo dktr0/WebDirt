@@ -43,109 +43,23 @@ function Graph(msg,ac,sampleBank){
 		this.source.playbackRate.exponentialRampToValueAtTime(msg.accelerate, this.source.buffer.duration);
 	}
 
-	// Distortion
-	if(isNaN(parseInt(msg.shape))) msg.shape = 0;
-	if(msg.shape!=0) {
-		//Distortion limited to [0,0.99)
-		if (Math.abs(msg.shape)>1) msg.shape=0.99;
-		else msg.shape=Math.abs(msg.shape);
-		temp = ac.createWaveShaper();
+	// // Distortion
+	// //if(isNaN(parseInt(msg.shape))) msg.shape = 0;
+	last = shape(last, msg.shape, ac);
 
-		//@Change makeDistortion Curve?
-		temp.curve = makeDistortionCurve(msg.shape*300);
-		temp.oversample = '2x';
-
-		//Connect Distortion to last, and pass on 'last'
-		last.connect(temp);
-		last=temp;
-	}
 
 	//Lowpass filtering @what level/function to set frequency and resonant gain at?
-	if(msg.resonance>0 && msg.resonance<=1 && msg.cutoff>0 && msg.cutoff<=1){
-
-			temp = ac.createBiquadFilter();
-			temp.type = 'lowpass';
-			temp.frequency.value = msg.cutoff*14000;
-			temp.Q.value = 0.1;
-
-			last.connect(temp);
-			last = temp;
-
-			temp = ac.createBiquadFilter();
-			temp.type = 'peaking';
-			temp.frequency.value = msg.cutoff*1400+100;
-			temp.Q.value=70;
-			temp.gain.value = msg.resonance*10;
-			last.connect(temp);
-			last = temp;
-	}
+	last = lowPassFilter(last, msg.cutoff, msg.resonance, ac);
 
 	//higpass filtering @what to do with resonance, and what level/function to set frequency at?
-	if(msg.hresonance>0 && msg.hresonance<1 && msg.hcutoff>0 && msg.hcutoff<1){
-			temp = ac.createBiquadFilter();
-			temp.type = 'highpass';
-			temp.frequency.value = msg.hcutoff*10000;
-			temp.Q.value = 0.1;
+	last = highPassFilter(last, msg.hcutoff, msg.hresonance, ac)
 
-			last.connect(temp);
-			last = temp;
-	}
+	//Band Pass Filtering @where to set frequency ranges?
+	last = bandPassFilter(last, msg.bandf, msg.bandq, ac)
 
-	//Bandpass Filter
-	if(msg.bandf>0 && msg.bandf<1 && msg.bandq>0){
-			temp = ac.createBiquadFilter();
-			temp.type = 'bandpass';
-			temp.frequency.value = msg.bandf*10000;
-			temp.Q.value = msg.bandq;
-
-			last.connect(temp);
-			last = temp;
-	}
-
-		//Vowel
-	if (msg.vowel=='a'||msg.vowel=='e'||msg.vowel=='i'||msg.vowel=='o'||msg.vowel=='u'){
-			var frequencies;
-			var q = [5/20,20/20,50/20];
-			var gains = [1,1,1,0.177,0.354]
-			var gain= ac.createGain();
-
-			switch (msg.vowel){
-				case('a'):
-					frequencies= [730,1090,2440];
-					break
-				case('e'):
-					frequencies = [270,2290,3010];
-					break
-				case('i'):
-					frequencies = [390, 1990,2550];
-					break;
-				case('o'):
-					frequencies = [360,1390, 1090];
-					break;
-				case('u'):
-					frequencies = [520,1190, 2390];
-			}
-			for(var i=0; i<3; i++){
-				temp = ac.createBiquadFilter()
-				temp.type = 'bandpass'
-				temp.Q.value=1;
-				temp.frequency.value=frequencies[i];
-				//temp.gain.value=gains[i];
-				gain.gain.value =gains[i];
-				//temp.connect(gain);
-				//temp.connect(gain);
-				last.connect(temp);
-				//temp.connect(gain);
-				last=temp;
-			}
-			temp = ac.createGain();
-			temp.gain.value=20;
-			last.connect(temp);
-			last=temp;
-	}
+	last = vowel(last, msg.vowel, ac);
 
 	//Samle_loop
-
 	/* if (msg.sample_loop>0){
 		last.loop=true;
 		console.log(last.loop)
@@ -164,6 +78,7 @@ function Graph(msg,ac,sampleBank){
 	//Crush
 	if(isNaN(parseInt(msg.crush))) msg.crush = null;
 	if (msg.crush != null){
+		console.log("crush is: "+msg.crush)
 		last = crush(this.source.buffer, msg.crush, ac)
 	}
 
@@ -195,6 +110,7 @@ function Graph(msg,ac,sampleBank){
 }
 
 Graph.prototype.start = function() {
+	console.log("start")
 	this.source.start(this.when,this.begin*this.source.buffer.duration,this.end*this.source.buffer.duration);
 }
 
@@ -259,6 +175,21 @@ last = ...
 */
 
 
+
+function bandPassFilter(input, bandf, bandq, ac){
+	//Bandpass Filter
+	if(bandf>0 && bandf<1 && bandq>0){
+			filterNode = ac.createBiquadFilter();
+			filterNode.type = 'bandpass';
+			filterNode.frequency.value = bandf*10000;
+			filterNode.Q.value = bandq;
+
+			input.connect(filterNode);
+			return filterNode;
+	}
+	else return input;
+}
+
 //returns a buffer source with a buffer with bit resolution degraded
 //by 'crush'
 function crush(buffer, crush, ac){
@@ -277,6 +208,78 @@ function crush(buffer, crush, ac){
 	source.buffer = newBuffer;
 
 	return source;
+}
+
+
+function highPassFilter (input, hcutoff, hresonance, ac){
+	
+	if(hresonance>0 && hresonance<1 && hcutoff>0 && hcutoff<1){
+			//Filtering
+			filterNode = ac.createBiquadFilter();
+			filterNode.type = 'highpass';
+			filterNode.frequency.value = hcutoff*10000;
+			filterNode.Q.value = 0.1;
+			input.connect(filterNode);
+			input = filterNode;
+
+			//Resonance
+			filterNode = ac.createBiquadFilter();
+			filterNode.type = 'peaking';
+			filterNode.frequency.value = hcutoff*10000+100;
+			filterNode.Q.value=70;
+			filterNode.gain.value = hresonance*10;
+			input.connect(filterNode);
+
+			input.connect(filterNode);
+			return filterNode;
+	}
+	else return input;
+}
+
+
+function lowPassFilter(input, cutoff, resonance, ac){
+
+	if(resonance>0 && resonance<=1 && cutoff>0 && cutoff<=1){
+
+			var filterNode = ac.createBiquadFilter();
+			filterNode.type = 'lowpass';
+			filterNode.frequency.value = cutoff*14000;
+			filterNode.Q.value = 0.1;
+
+			input.connect(filterNode);
+			input = filterNode;
+
+			filterNode = ac.createBiquadFilter();
+			filterNode.type = 'peaking';
+			filterNode.frequency.value = cutoff*1400+100;
+			filterNode.Q.value=70;
+			filterNode.gain.value = resonance*10;
+			input.connect(filterNode);
+			return filterNode;
+	}
+	else return input
+
+}
+
+function shape(input, shape, ac){
+	if (isNaN(parseInt(shape)))return input;
+
+	if(shape!=0) {
+		//Distortion limited to [0,1]
+		if (Math.abs(shape)>1) shape=1;
+		else shape=Math.abs(shape);
+		var distortionNode = ac.createWaveShaper();
+
+		//@Change makeDistortion Curve?
+		distortionNode.curve = makeDistortionCurve(shape*300);
+		distortionNode.oversample = '2x';
+
+		//Connect Distortion to last, and pass on 'last'
+		input.connect(distortionNode);
+		return distortionNode;
+	}
+	else 
+		return input;
 }
 
 //Returns a new BufferSourceNode containing a buffer with the reversed frames of the
@@ -347,3 +350,46 @@ function decimate(buffer,rate,ac){
 	newsource.buffer = newBuffer;
 	return newsource;
  }
+
+//Vowel effect
+//@ get frequencies from superdirt
+function vowel (input, vowel, ac){
+	if (vowel=='a'||vowel=='e'||vowel=='i'||vowel=='o'||vowel=='u'){
+			var frequencies;
+			var q = [5/20,20/20,50/20];
+			var gain= ac.createGain();
+
+			switch (vowel){
+				case('a'):
+					frequencies= [730,1090,2440];
+					break
+				case('e'):
+					frequencies = [270,2290,3010];
+					break
+				case('i'):
+					frequencies = [390, 1990,2550];
+					break;
+				case('o'):
+					frequencies = [360,1390, 1090];
+					break;
+				case('u'):
+					frequencies = [520,1190, 2390];
+			}
+			for(var i=0; i<3; i++){
+				filterNode = ac.createBiquadFilter()
+				filterNode.type = 'bandpass'
+				filterNode.Q.value=1;
+				filterNode.frequency.value=frequencies[i];
+
+				input.connect(filterNode);
+				//temp.connect(gain);
+				input=filterNode;
+			}
+			var makeupGain = ac.createGain();
+			makeupGain.gain.value=20;
+			filterNode.connect(makeupGain);
+			return makeupGain;
+	}
+	else return input
+}
+
