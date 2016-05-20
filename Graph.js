@@ -10,7 +10,7 @@ var vowels={
 function Graph(msg,ac,sampleBank){
 	this.ac = ac;
 	var last,temp;
-
+	this.when = msg.when;
 	// get basic buffer player, including speed change and sample reversal
 	this.source = last = ac.createBufferSource();
 	if(typeof msg.begin != 'number') msg.begin = 0;
