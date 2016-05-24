@@ -71,7 +71,8 @@ SampleBank.prototype.load = function(name,number) {
 SampleBank.prototype.getBuffer = function(name,number) {
   if(this.sampleMap == null) throw Error("SampleBank.getBuffer: sampleMap is null");
   if(this.sampleMap[name] == null) throw Error("SampleBank.getBuffer: no sampleMap for " + name);
-  if(number >= this.sampleMap[name].length) throw Error("SampleBank.getBuffer: number > number of samples");
+  number = number % this.sampleMap[name].length;
+
   var filename = this.sampleMap[name][number];
   if(this.samples[filename] == null) {
     this.load(name,number);
