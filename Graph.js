@@ -73,20 +73,15 @@ function Graph(msg,ac,sampleBank){
 	// Delay
 	last = this.delay(last,msg.delay,msg.delaytime,msg.delayfeedback);
 
-	//Samle_loop
-	/* if (msg.sample_loop>0){
-		last.loop=true;
-		console.log(last.loop)
-		last.connect(ac.destination)
-		this.source.start(0)
-		return
-	} */
-
+	//Sample Loop (not yet working)
+	//last = this.loop(last, msg.loop, msg.begin, msg.end);
+	
 	//Coarse
 	last = this.coarse(last, msg.coarse);
 
 	//Crush
 	last = this.crush(last, msg.crush);
+
 
 
 	//Gain
@@ -271,10 +266,10 @@ Graph.prototype.coarse = function(input, coarse){
 
 Graph.prototype.start = function() {
 	console.log("start")
-	this.source.start(this.when,this.begin*this.source.buffer.duration,this.end*this.source.buffer.duration);
+	this.source.start(0,this.begin*this.source.buffer.duration,this.end*this.source.buffer.duration);
 }
 
-
+//@gain on first hit of something with a delay
 Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
 	console.log(outputGain)
 	if(isNaN(parseInt(outputGain))) outputGain = 0;
@@ -291,17 +286,54 @@ Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
 			console.log("warning: delayfeedback not a number, using default of 0.5");
 			delayFeedback = 0.5;
 		}
-		try{
 		feedBackGain.gain.value= delayFeedback;
 		var delayGain = this.ac.createGain();
 		delayGain.gain.value = outputGain;
 		input.connect(delayNode);
 		delayNode.connect(feedBackGain);
 		delayNode.connect(delayGain);
-		feedBackGain.connect(delayNode);}catch(e){console.log(e)}
+		feedBackGain.connect(delayNode);
 		return delayGain;
 	} 
 	else return input;
+}
+
+//In progress...
+Graph.prototype.loop = function(input, loopCount, begin, end){
+
+	if(isNaN(parseInt(loopCount)) || loopCount==0) return input
+
+	var looped = this.ac.createDelay();
+	begin=0;
+	end=1;
+	console.log(this.source.buffer.duration)
+	try{
+	//	looped.delayTime.value = (this.source.buffer.duration-begin*this.source.buffer.duration-(1-end))/this.source.playbackRate.value
+		looped.delayTime.value = this.source.buffer.duration;
+		var gain = this.ac.createGain()
+		gain.gain.value = 1
+		var gain2 = this.ac.createGain();
+		gain2.gain.value =1;
+		gain.gain.setValueAtTime(0,this.ac.currentTime+this.source.buffer.duration*loopCount)
+		console.log(this.ac.currentTime+this.source.buffer.duration*loopCount)
+
+		input.connect(looped);
+		looped.connect(gain);
+		looped.connect(gain2);
+		gain.connect(looped);
+	}
+	catch(e){console.log(e.stack)}
+
+		return gain2;
+// var gain = this.ac.createGain();
+	// gain.gain.value =1
+	// gain.gain.setValueAtTime(0,this.ac.currentTime+this.source.buffer.duration*loopCount);
+	// this.source.loop=true;
+	// this.source.loopStart = begin*this.source.buffer.duration
+	// this.source.loopEnd = end*this.source.buffer.duration
+	// input.connect(gain)
+
+
 }
 
 //@Refine/differentiate?
