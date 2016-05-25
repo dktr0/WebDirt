@@ -14,7 +14,7 @@ function Graph(msg,ac,sampleBank){
 	if(isNaN(parseInt(msg.speed))) msg.speed = 1;
 	if(msg.speed>=0 && buffer != null) this.source.buffer = buffer;
 	if(msg.speed<0 && buffer != null) {
-		this.source.buffer=buffer; 
+		this.source.buffer=buffer;
 		last = this.reverse(last)
 	}
 	this.source.playbackRate.value=Math.abs(msg.speed);
@@ -32,17 +32,14 @@ function Graph(msg,ac,sampleBank){
 		},reattemptDelay);
 	}
 
-	//Calls functions that disconnect scriptNodes used to generate effects
-	//once the sample has finished playing. @cleaner way of doing this...
+	var parent = this;
 	this.source.onended = function(){
-		//Try and catch blocks needed because these functions may not be defined
-		//(ie. if the effects weren't used)
-		 try{this.disconnectReverse();}
-		 catch (e){};
-		try{this.disconnectCrush()}
-		catch(e){};
-		try {this.disconnectCoarse();}
-		catch (e){};
+		if(parent.disconnectQueue == null) return;
+		for(let x of parent.disconnectQueue) {
+			if(x.input == null) throw Error("first of pair of things to disconnect must exist");
+			if(x.output == null) x.input.disconnect();
+			else x.input.disconnect(x.output);
+		}
 	}
 
 	// Accelerate
@@ -146,7 +143,7 @@ function otherAccelerate(buffer, accelerate, ac){
 	var source = ac.createBufferSource();
 	var newChannelData = new Float32Array(frames);
 	buffer.copyFromChannel(pcmData,0,0);
-	
+
 	for(var frame = 0; frame <buffer.length; frame++){
 		newChannelData[frame] = pcmData[Math.round((frame*accelerate*frame))/19];
 	}
@@ -177,24 +174,27 @@ Graph.prototype.reverse = function(input){
 		}//Channels
 		//return outputBuffer
 			console.log("reverse handler")
-	}//end scriptNode audio processing handler 
+	}//end scriptNode audio processing handler
 
 	//Defines a function to disconnect the script processor node
 	//if a reverse effect is added (called in onended funciton of this.source)
-	this.source.disconnectReverse = function(){
-		scriptNode.disconnect();
-		input.disconnect(scriptNode);
-	}
-
+	this.disconnectOnEnd(input,scriptNode);
+	this.disconnectOnEnd(scriptNode);
 
 	return scriptNode;
 }
 
+Graph.prototype.disconnectOnEnd = function(x,y) {
+	console.log("disconnectOnEnd");
+	var obj = {input:x,output:y};
+	if(this.disconnectQueue == null) this.disconnectQueue = new Array;
+	this.disconnectQueue.push(obj);
+}
 
 //Crush
 Graph.prototype.crush = function(input, crush){
 
-	
+
 	if(isNaN(parseInt(crush))) crush = null;
 
 	if(crush!=null && crush>0){
@@ -212,21 +212,21 @@ Graph.prototype.crush = function(input, crush){
 					outputData[frame]=Math.round(inputData[frame]*Math.pow(2,(crush-1)))/Math.pow(2,(crush-1));
 				}//Frames
 			}//Channels
-				console.log("crush handler")
-		}//end scriptNode audio processing handler 
-		
+				//console.log("crush handler")
+		}//end scriptNode audio processing handler
+
 		input.connect(scriptNode);
 		//Defines a function to disconnect the script processor node
 		//if a crush effect is added (called in onended funciton of this.source)
-		this.source.disconnectCrush = function(){
-			scriptNode.disconnect();
-			input.disconnect(scriptNode);
-		};
+
+		this.disconnectOnEnd(input,scriptNode);
+		this.disconnectOnEnd(scriptNode);
+
 	return scriptNode;
-	}	
+	}
 	else{
 		return input
-		
+
 	}
 }//End Crush
 
@@ -236,12 +236,12 @@ Graph.prototype.coarse = function(input, coarse){
 	if(isNaN(parseInt(coarse))) coarse = 1;
 	coarse=Math.abs(coarse);
 	//If coarse is valid, coarseNode becomes last with coarseNode effect
-	//otherwise, coarseNode becomes last 		
+	//otherwise, coarseNode becomes last
 	if(coarse>1){
 		var	scriptNode = this.ac.createScriptProcessor();
 		scriptNode.onaudioprocess = function(audioProcessingEvent){
 			var inputBuffer = audioProcessingEvent.inputBuffer;
-		
+
 			var outputBuffer = audioProcessingEvent.outputBuffer;
 
 			for (var channel=0;channel<outputBuffer.numberOfChannels; channel++){
@@ -249,22 +249,20 @@ Graph.prototype.coarse = function(input, coarse){
 				var outputData = outputBuffer.getChannelData(channel);
 				for(var frame=0; frame<inputBuffer.length; frame++){
 					if(frame%coarse==0) outputData[frame]=inputData[frame];
-					else outputData[frame]=outputData[frame-1];	
+					else outputData[frame]=outputData[frame-1];
 				}//Frames
 			}//Channels
-		console.log("coarse handler")
-		}//end scriptNode audio processing handler 
+		//console.log("coarse handler")
+		}//end scriptNode audio processing handler
 
 		input.connect(scriptNode);
-		//Defines a function to disconnect the script processor node
-		//if a coarse effect is added (called in onended funciton of this.source)
-		this.source.disconnectCoarse = function(){
-			input.disconnect(scriptNode)
-			scriptNode.disconnect();
-		};
+
+		this.disconnectOnEnd(input,scriptNode);
+		this.disconnectOnEnd(scriptNode);
+
 		return scriptNode;
 	}
-	else 
+	else
 		return input
 }
 
@@ -300,7 +298,7 @@ Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
 		delayNode.connect(delayGain);
 		feedBackGain.connect(delayNode);}catch(e){console.log(e)}
 		return delayGain;
-	} 
+	}
 	else return input;
 }
 
@@ -331,7 +329,7 @@ Graph.prototype.bandPassFilter=function(input, bandf, bandq){
 }
 
 Graph.prototype.highPassFilter = function (input, hcutoff, hresonance){
-	
+
 	if(hresonance>0 && hresonance<1 && hcutoff>0 && hcutoff<1){
 			//Filtering
 			filterNode = this.ac.createBiquadFilter();
@@ -397,7 +395,7 @@ Graph.prototype.shape = function (input, shape){
 		input.connect(distortionNode);
 		return distortionNode;
 	}
-	else 
+	else
 		return input;
 }
 
@@ -546,4 +544,3 @@ function crush(buffer, crush, ac){
 
 
 */
-
