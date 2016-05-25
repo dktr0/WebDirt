@@ -15,10 +15,38 @@ WebDirt.prototype.queue = function(msg) {
 	var graph = new Graph(msg,this.ac,this.sampleBank);
 }
 
-WebDirt.prototype.subscribeToTidalSocket = function(withLog) {
+WebDirt.prototype.playScore = function(score) {
+  // where score is an array of message objects (each of which fulfills same expectations as the method 'queue' above)
+  var start = this.ac.currentTime + 0.25;
+  for(let msg of score) {
+    msg.when = msg.when + start;
+    // begin: a temporary kludge
+    msg.sample_name = msg.s;
+    if(msg.n != null) msg.sample_n = msg.n;
+    // end: a temporary kludge
+    this.sampleBank.load(msg.sample_name,msg.sample_n); // make an early attempt to load samples, ahead of playback
+    this.queue(msg);
+  }
+}
+
+WebDirt.prototype.loadAndPlayScore = function(url) {
+  var request = new XMLHttpRequest();
+  request.open('GET',url,true);
+  request.responseType = "json";
+  var closure = this;
+  request.onload = function() {
+    if(request.readyState != 4) throw Error("readyState != 4 in callback of loadAndPlayScore");
+    if(request.status != 200) throw Error("status != 200 in callback of loadAndPlayScore");
+    if(request.response == null) throw Error("JSON response null in callback of loadAndPlayScore");
+    console.log("playing JSON score from " + url);
+    closure.playScore(request.response);
+  }
+  request.send();
+}
+
+WebDirt.prototype.subscribeToTidalSocket = function(url,withLog) {
   if(withLog == null)withLog = false;
   window.WebSocket = window.WebSocket || window.MozWebSocket;
-  var url = 'ws://127.0.0.1:7771'; // hard-coded to local server for now...
   console.log("attempting websocket connection to " + url);
   ws = new WebSocket(url);
   ws.onopen = function () { console.log("websocket connection to tidalSocket opened"); };
