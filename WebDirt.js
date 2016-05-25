@@ -12,7 +12,7 @@ WebDirt = function() {
 
 WebDirt.prototype.queue = function(msg) {
 	if(msg.when==null) throw Error ("Sample given no 'when' parameter");
-	var graph = new Graph(msg,this.ac,this.sampleBank);
+  var graph = new Graph(msg,this.ac,this.sampleBank);
 }
 
 WebDirt.prototype.subscribeToTidalSocket = function(withLog) {

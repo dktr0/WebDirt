@@ -1,7 +1,5 @@
 var OUTPUT_CHANNELS=2;
 
-
-
 function Graph(msg,ac,sampleBank){
 	this.ac = ac;
 	var last,temp;
@@ -34,13 +32,20 @@ function Graph(msg,ac,sampleBank){
 		},reattemptDelay);
 	}
 
+	//Calls functions that disconnect scriptNodes used to generate effects
+	//once the sample has finished playing. @cleaner way of doing this...
 	this.source.onended = function(){
-		this.disconnectReverse();
-		this.disconnectCrush();
-		this.disconnectCoarse();
+		//Try and catch blocks needed because these functions may not be defined
+		//(ie. if the effects weren't used)
+		 try{this.disconnectReverse();}
+		 catch (e){};
+		try{this.disconnectCrush()}
+		catch(e){};
+		try {this.disconnectCoarse();}
+		catch (e){};
 	}
 
-	// accelerate
+	// Accelerate
 	if(isNaN(parseInt(msg.accelerate))) msg.accelerate = 0;
 	if(msg.accelerate!=0){
 		last = otherAccelerate(this.source.buffer, msg.accelerate, ac)
@@ -78,11 +83,11 @@ function Graph(msg,ac,sampleBank){
 	} */
 
 	//Coarse
-
 	last = this.coarse(last, msg.coarse);
 
 	//Crush
 	last = this.crush(last, msg.crush);
+
 
 	//Gain
 	if(isNaN(parseInt(msg.gain))) msg.gain = 1;
@@ -171,12 +176,16 @@ Graph.prototype.reverse = function(input){
 			}//Frames
 		}//Channels
 		//return outputBuffer
+			console.log("reverse handler")
 	}//end scriptNode audio processing handler 
 
+	//Defines a function to disconnect the script processor node
+	//if a reverse effect is added (called in onended funciton of this.source)
 	this.source.disconnectReverse = function(){
 		scriptNode.disconnect();
 		input.disconnect(scriptNode);
 	}
+
 
 	return scriptNode;
 }
@@ -203,12 +212,15 @@ Graph.prototype.crush = function(input, crush){
 					outputData[frame]=Math.round(inputData[frame]*Math.pow(2,(crush-1)))/Math.pow(2,(crush-1));
 				}//Frames
 			}//Channels
+				console.log("crush handler")
 		}//end scriptNode audio processing handler 
 		
 		input.connect(scriptNode);
+		//Defines a function to disconnect the script processor node
+		//if a crush effect is added (called in onended funciton of this.source)
 		this.source.disconnectCrush = function(){
-			input.disconnect();
 			scriptNode.disconnect();
+			input.disconnect(scriptNode);
 		};
 	return scriptNode;
 	}	
@@ -240,11 +252,14 @@ Graph.prototype.coarse = function(input, coarse){
 					else outputData[frame]=outputData[frame-1];	
 				}//Frames
 			}//Channels
+		console.log("coarse handler")
 		}//end scriptNode audio processing handler 
 
 		input.connect(scriptNode);
+		//Defines a function to disconnect the script processor node
+		//if a coarse effect is added (called in onended funciton of this.source)
 		this.source.disconnectCoarse = function(){
-			input.disconnect()
+			input.disconnect(scriptNode)
 			scriptNode.disconnect();
 		};
 		return scriptNode;
@@ -261,27 +276,29 @@ Graph.prototype.start = function() {
 
 
 Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
+	console.log(outputGain)
 	if(isNaN(parseInt(outputGain))) outputGain = 0;
 	outputGain = Math.abs(outputGain);
 	if(outputGain!=0){
-		var delayNode = ac.createDelay();
+		var delayNode = this.ac.createDelay();
 		if(isNaN(parseInt(delayTime))) {
 			console.log("warning: delaytime not a number, using default of 1");
 			delayTime = 1;
 		}
 		delayNode.delayTime.value = delayTime;
-		var feedBackGain = ac.createGain();
+		var feedBackGain = this.ac.createGain();
 		if(isNaN(parseInt(delayFeedback))) {
 			console.log("warning: delayfeedback not a number, using default of 0.5");
 			delayFeedback = 0.5;
 		}
+		try{
 		feedBackGain.gain.value= delayFeedback;
-		var delayGain = ac.createGain();
+		var delayGain = this.ac.createGain();
 		delayGain.gain.value = outputGain;
 		input.connect(delayNode);
 		delayNode.connect(feedBackGain);
 		delayNode.connect(delayGain);
-		feedbackGain.connect(delayNode);
+		feedBackGain.connect(delayNode);}catch(e){console.log(e)}
 		return delayGain;
 	} 
 	else return input;
