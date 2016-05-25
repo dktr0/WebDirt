@@ -92,7 +92,7 @@ function Graph(msg,ac,sampleBank){
 	//this is necessary or the processor node's (coarseNode's) handler
 	//function will infinitely be invoked
 	last.onended=function(){
-		last.disconnect(coarseNode)
+	    if (last !== coarseNode) { last.disconnect(coarseNode) }
 		coarseNode.disconnect()
 	}
 
@@ -111,7 +111,7 @@ function Graph(msg,ac,sampleBank){
 	else crushNode = coarseNode;
 
 	coarseNode.onended = function(){
-		coarseNode.disconnect(crushNode)
+	    if (coarseNode !== crushNode) {coarseNode.disconnect(crushNode)}
 		crushNode.disconnect();
 	}
 
