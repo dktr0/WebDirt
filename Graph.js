@@ -1,9 +1,11 @@
 var OUTPUT_CHANNELS=2;
 
+
+
 function Graph(msg,ac,sampleBank){
 	this.ac = ac;
 	var last,temp;
-
+	this.when = msg.when;
 	// get basic buffer player, including speed change and sample reversal
 	this.source = last = ac.createBufferSource();
 	if(typeof msg.begin != 'number') msg.begin = 0;
@@ -32,6 +34,11 @@ function Graph(msg,ac,sampleBank){
 		},reattemptDelay);
 	}
 
+	this.source.onended = function(){
+		this.disconnectReverse();
+		this.disconnectCrush();
+		this.disconnectCoarse();
+	}
 
 	// accelerate
 	if(isNaN(parseInt(msg.accelerate))) msg.accelerate = 0;
@@ -71,6 +78,7 @@ function Graph(msg,ac,sampleBank){
 	} */
 
 	//Coarse
+
 	last = this.coarse(last, msg.coarse);
 
 	//Crush
@@ -165,7 +173,7 @@ Graph.prototype.reverse = function(input){
 		//return outputBuffer
 	}//end scriptNode audio processing handler 
 
-	this.source.onended = function(){
+	this.source.disconnectReverse = function(){
 		scriptNode.disconnect();
 		input.disconnect(scriptNode);
 	}
@@ -180,7 +188,6 @@ Graph.prototype.crush = function(input, crush){
 	
 	if(isNaN(parseInt(crush))) crush = null;
 
-	console.log(crush)
 	if(crush!=null && crush>0){
 
 	var scriptNode = this.ac.createScriptProcessor();
@@ -196,12 +203,11 @@ Graph.prototype.crush = function(input, crush){
 					outputData[frame]=Math.round(inputData[frame]*Math.pow(2,(crush-1)))/Math.pow(2,(crush-1));
 				}//Frames
 			}//Channels
-			console.log("crush handler called")
 		}//end scriptNode audio processing handler 
 		
 		input.connect(scriptNode);
-		this.source.onended = function(){
-			input.disconnect()
+		this.source.disconnectCrush = function(){
+			input.disconnect();
 			scriptNode.disconnect();
 		};
 	return scriptNode;
@@ -234,16 +240,13 @@ Graph.prototype.coarse = function(input, coarse){
 					else outputData[frame]=outputData[frame-1];	
 				}//Frames
 			}//Channels
-			console.log("coarse handler called")
-
 		}//end scriptNode audio processing handler 
 
 		input.connect(scriptNode);
-		this.source.onended= function(){
+		this.source.disconnectCoarse = function(){
 			input.disconnect()
 			scriptNode.disconnect();
 		};
-		console.log("coarse")
 		return scriptNode;
 	}
 	else 
