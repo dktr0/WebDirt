@@ -1,11 +1,4 @@
 var OUTPUT_CHANNELS=2;
-var vowels={
-	a : {frequencies: []},
-	e :	{frequencies: [270,2300,3000]},
-	i : {frequencies: []},
-	o : {frequencies: []},
-	u : {frequencies: []}
-};
 
 function Graph(msg,ac,sampleBank){
 	this.ac = ac;
@@ -20,7 +13,10 @@ function Graph(msg,ac,sampleBank){
 	var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
 	if(isNaN(parseInt(msg.speed))) msg.speed = 1;
 	if(msg.speed>=0 && buffer != null) this.source.buffer = buffer;
-	if(msg.speed<0 && buffer != null) {this.source.buffer=buffer; last = reverse(last,ac)};
+	if(msg.speed<0 && buffer != null) {
+		this.source.buffer=buffer; 
+		last = this.reverse(last)
+	}
 	this.source.playbackRate.value=Math.abs(msg.speed);
 	if(buffer != null) this.start();
 	else { // buffer not available but may be available soon
@@ -36,29 +32,34 @@ function Graph(msg,ac,sampleBank){
 		},reattemptDelay);
 	}
 
+
 	// accelerate
 	if(isNaN(parseInt(msg.accelerate))) msg.accelerate = 0;
 	if(msg.accelerate!=0){
-		this.source.playbackRate.exponentialRampToValueAtTime(msg.accelerate, this.source.buffer.duration);
+		last = otherAccelerate(this.source.buffer, msg.accelerate, ac)
+		last.connect(ac.destination)
+		last.start(0)
+		return
 	}
 
-	// // Distortion
-	// //if(isNaN(parseInt(msg.shape))) msg.shape = 0;
-	last = shape(last, msg.shape, ac);
+
+	// Distortion
+	last = this.shape(last, msg.shape);
 
 	//Lowpass filtering @what level/function to set frequency and resonant gain at?
-	last = lowPassFilter(last, msg.cutoff, msg.resonance, ac);
+	last = this.lowPassFilter(last, msg.cutoff, msg.resonance);
 
-	//higpass filtering @what to do with resonance, and what level/function to set frequency at?
-	last = highPassFilter(last, msg.hcutoff, msg.hresonance, ac)
+	//higpass filtering @what level/function to set frequency and resonant gain at?
+	last = this.highPassFilter(last, msg.hcutoff, msg.hresonance)
 
 	//Band Pass Filtering @where to set frequency ranges?
-	last = bandPassFilter(last, msg.bandf, msg.bandq, ac)
+	last = this.bandPassFilter(last, msg.bandf, msg.bandq)
 
-	last = vowel(last, msg.vowel, ac);
+	//Vowel
+	last = this.vowel(last, msg.vowel);
 
 	// Delay
-	last = delay(last,msg.delay,msg.delaytime,msg.delayfeedback);
+	last = this.delay(last,msg.delay,msg.delaytime,msg.delayfeedback);
 
 	//Samle_loop
 	/* if (msg.sample_loop>0){
@@ -69,123 +70,91 @@ function Graph(msg,ac,sampleBank){
 		return
 	} */
 
-
-	/*For testing otherCoarse (leave here for now)
-	last = otherCoarse(last, msg.coarse, ac);
-	var crushNode=last;*/
-
 	//Coarse
-	//Safety and msg parsing
-	if(isNaN(parseInt(msg.coarse))) msg.coarse = 1;
-	msg.coarse=Math.abs(msg.coarse);
-
-	var coarseNode;
-	//If coarse is valid, coarseNode becomes last with coarseNode effect
-	//otherwise, coarseNode becomes last 		
-	if(msg.coarse>1){
-		//New script processor node	
-		coarseNode = coarse(msg.coarse, ac)
-		last.connect(coarseNode);
-	}
-	else coarseNode = last;
-	//When last is done playing, disconnects last from coarseNode
-	//this is necessary or the processor node's (coarseNode's) handler
-	//function will infinitely be invoked
-	last.onended=function(){
-		last.disconnect(coarseNode)
-		coarseNode.disconnect()
-	}
-
-
+	last = this.coarse(last, msg.coarse);
 
 	//Crush
-	if(isNaN(parseInt(msg.crush))) msg.crush = null;
-	else msg.crush=Math.abs(msg.crush)
-	var crushNode;
-
-	if(msg.crush!=null && msg.crush>0){
-		console.log("hello")
-		crushNode=crush(msg.crush, ac)
-		coarseNode.connect(crushNode);
-	}
-	else crushNode = coarseNode;
-
-	coarseNode.onended = function(){
-		coarseNode.disconnect(crushNode)
-		crushNode.disconnect();
-	}
-
-
-
-
+	last = this.crush(last, msg.crush);
 
 	//Gain
 	if(isNaN(parseInt(msg.gain))) msg.gain = 1;
 	var gain = ac.createGain();
-	// @this should be as per Dirt's mapping...
-	gain.gain.value = Math.abs(msg.gain);
-	crushNode.connect(gain);
-	var last1 = gain;
+	gain.gain.value = Math.abs(Math.pow(msg.gain/2,4));
+	last.connect(gain);
+	var last = gain;
 
 
 	//Panning (currently stereo)
 	if(isNaN(parseInt(msg.pan))) msg.pan = 0.5;
 	var gain1 = ac.createGain();
 	var gain2 = ac.createGain();
-	gain1.gain.value=1-msg.pan;
-	gain2.gain.value=msg.pan;
+
+	//gain1.gain.value= (-1)*Math.pow((1-msg.pan) -1,2)+0.5;
+	//gain2.gain.value=(-1)*Math.pow(msg.pan-1,2)+0.5;;
+	 gain1.gain.value =1-msg.pan;
+	 gain2.gain.value= msg.pan;
 	// @should do equal power panning or something like that instead, i.e. +3 dB as becomes centre-panned
-	last1.connect(gain1);
-	last1.connect(gain2);
+	last.connect(gain1);
+	last.connect(gain2);
 	var channelMerger = ac.createChannelMerger(2);
 	gain1.connect(channelMerger,0,0);
 	gain2.connect(channelMerger,0,1);
 	channelMerger.connect(ac.destination);
 
+
 }
 
 
-//Coarse
-//Returns a scriptNode that will create a fake-resampling effect when .connected to another node.
-//Note: is important to disconnect what is returned by this function once a sample has finished playing
-//otherwise the onaudioprocess function will be called infinitely.
-function coarse (coarse, ac){
-	var scriptNode = ac.createScriptProcessor();
+//Accelerate
+function accelerate (accelerate, ac){
+	var scriptNode = this.ac.createScriptProcessor();
+
 	scriptNode.onaudioprocess = function(audioProcessingEvent){
-		var inputBuffer = audioProcessingEvent.inputBuffer;	
-		var outputBuffer = audioProcessingEvent.outputBuffer;
-		for (var channel=0;channel<outputBuffer.numberOfChannels; channel++){
+		var inputBuffer = audioProcessingEvent.inputBuffer;
+		var ouputBuffer = audioProcessingEvent.outputBuffer;
+		for (var channel = 0; channel <inputBuffer.numberOfChannels; channel++){
 			var inputData = inputBuffer.getChannelData(channel);
 			var outputData = outputBuffer.getChannelData(channel);
-			for(var frame=0; frame<inputBuffer.length; frame++){
-
-				 if(frame%coarse==0) outputData[frame]=inputData[frame];
-				else outputData[frame]=outputData[frame-1];				
+			for(var frame = 0; accelerate*frame <inputBuffer.length; frame++){
+				outputData[frame] = inputData[frame*accelerate];
 			}
 		}
-		console.log("hello")
-		//return outputBuffer
-	}//end scriptNode audio processing handler 
-	
-	return scriptNode;
+	}
+
+	return scriptNode
 }
 
+
+//Accelerate
+function otherAccelerate(buffer, accelerate, ac){
+	var frames = buffer.length;
+	var pcmData = new Float32Array(frames);
+	var newBuffer = ac.createBuffer(buffer.numberOfChannels,buffer.length,ac.sampleRate);
+	var source = ac.createBufferSource();
+	var newChannelData = new Float32Array(frames);
+	buffer.copyFromChannel(pcmData,0,0);
+	
+	for(var frame = 0; frame <buffer.length; frame++){
+		newChannelData[frame] = pcmData[Math.round((frame*accelerate*frame))/19];
+	}
+
+	newBuffer.copyToChannel(newChannelData,0,0);
+	source.buffer = newBuffer;
+
+	return source;
+}
 
 
 //@ is the scriptNode handler continuously called even after it has finished playing?
 //how to stop that?
-function reverse (input, ac){
+Graph.prototype.reverse = function(input){
 
-	
-	var scriptNode = ac.createScriptProcessor();
-
+	var scriptNode = this.ac.createScriptProcessor();
 	input.connect(scriptNode);
 
 	scriptNode.onaudioprocess = function(audioProcessingEvent){
 		var inputBuffer = audioProcessingEvent.inputBuffer;
-	
 		var outputBuffer = audioProcessingEvent.outputBuffer;
-
 		for (var channel=0;channel<outputBuffer.numberOfChannels; channel++){
 			var inputData = inputBuffer.getChannelData(channel);
 			var outputData = outputBuffer.getChannelData(channel);
@@ -194,63 +163,92 @@ function reverse (input, ac){
 			}//Frames
 		}//Channels
 		//return outputBuffer
-		console.log("input: ");
-		console.log(inputData)
-		console.log("output: ")
-		console.log(outputData);
 	}//end scriptNode audio processing handler 
+
+	this.source.onended = function(){
+		scriptNode.disconnect();
+		input.disconnect(scriptNode);
+	}
 
 	return scriptNode;
 }
 
 
-//@ is the scriptNode handler continuously called even after it has finished playing?
-//how to stop that?
-function crush (crush, ac){
+//Crush
+Graph.prototype.crush = function(input, crush){
 
-	var scriptNode = ac.createScriptProcessor();
+	
+	if(isNaN(parseInt(crush))) crush = null;
 
-	//scriptNode Processing Handler
-	scriptNode.onaudioprocess = function(audioProcessingEvent){
-		var inputBuffer = audioProcessingEvent.inputBuffer;
-		var outputBuffer = audioProcessingEvent.outputBuffer;
-		for (var channel=0;channel<outputBuffer.numberOfChannels; channel++){
-			var inputData = inputBuffer.getChannelData(channel);
-			var outputData = outputBuffer.getChannelData(channel);
-			for(var frame=0; frame<inputBuffer.length; frame++){
+	console.log(crush)
+	if(crush!=null && crush>0){
 
-				outputData[frame]=Math.round(inputData[frame]*Math.pow(2,(crush-1)))/Math.pow(2,(crush-1));
-			}//Frames
-		}//Channels
-	}//end scriptNode audio processing handler 
+	var scriptNode = this.ac.createScriptProcessor();
+
+		//scriptNode Processing Handler
+		scriptNode.onaudioprocess = function(audioProcessingEvent){
+			var inputBuffer = audioProcessingEvent.inputBuffer;
+			var outputBuffer = audioProcessingEvent.outputBuffer;
+			for (var channel=0;channel<outputBuffer.numberOfChannels; channel++){
+				var inputData = inputBuffer.getChannelData(channel);
+				var outputData = outputBuffer.getChannelData(channel);
+				for(var frame=0; frame<inputBuffer.length; frame++){
+					outputData[frame]=Math.round(inputData[frame]*Math.pow(2,(crush-1)))/Math.pow(2,(crush-1));
+				}//Frames
+			}//Channels
+			console.log("crush handler called")
+		}//end scriptNode audio processing handler 
+		
+		input.connect(scriptNode);
+		this.source.onended = function(){
+			input.disconnect()
+			scriptNode.disconnect();
+		};
 	return scriptNode;
-
+	}	
+	else{
+		return input
+		
+	}
 }//End Crush
 
+//Coarse Effect
+Graph.prototype.coarse = function(input, coarse){
+	//Safety and msg parsing
+	if(isNaN(parseInt(coarse))) coarse = 1;
+	coarse=Math.abs(coarse);
+	//If coarse is valid, coarseNode becomes last with coarseNode effect
+	//otherwise, coarseNode becomes last 		
+	if(coarse>1){
+		var	scriptNode = this.ac.createScriptProcessor();
+		scriptNode.onaudioprocess = function(audioProcessingEvent){
+			var inputBuffer = audioProcessingEvent.inputBuffer;
+		
+			var outputBuffer = audioProcessingEvent.outputBuffer;
 
+			for (var channel=0;channel<outputBuffer.numberOfChannels; channel++){
+				var inputData = inputBuffer.getChannelData(channel);
+				var outputData = outputBuffer.getChannelData(channel);
+				for(var frame=0; frame<inputBuffer.length; frame++){
+					if(frame%coarse==0) outputData[frame]=inputData[frame];
+					else outputData[frame]=outputData[frame-1];	
+				}//Frames
+			}//Channels
+			console.log("coarse handler called")
 
+		}//end scriptNode audio processing handler 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+		input.connect(scriptNode);
+		this.source.onended= function(){
+			input.disconnect()
+			scriptNode.disconnect();
+		};
+		console.log("coarse")
+		return scriptNode;
+	}
+	else 
+		return input
+}
 
 
 Graph.prototype.start = function() {
@@ -259,7 +257,7 @@ Graph.prototype.start = function() {
 }
 
 
-function delay(input,outputGain,delayTime,delayFeedback) {
+Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
 	if(isNaN(parseInt(outputGain))) outputGain = 0;
 	outputGain = Math.abs(outputGain);
 	if(outputGain!=0){
@@ -282,28 +280,26 @@ function delay(input,outputGain,delayTime,delayFeedback) {
 		delayNode.connect(delayGain);
 		feedbackGain.connect(delayNode);
 		return delayGain;
-	} else return input;
+	} 
+	else return input;
 }
 
-//Borrowed from documentation @may want to redo/make differently
-function makeDistortionCurve(amount) {
-  var k = typeof amount === 'number' ? amount : 50,
-    n_samples = 44100,
-    curve = new Float32Array(n_samples),
-    deg = Math.PI / 180,
-    i = 0,
-    x;
-  for ( ; i < n_samples; ++i ) {
-    x = i * 2 / n_samples - 1;
-    curve[i] = ( 3 + k ) * x * 20 * deg / ( Math.PI + k * Math.abs(x) );
-  }
-  return curve;
-};
+//@Refine/differentiate?
+function makeDistortionCurve(amount){
+	var curve = new Float32Array(44100);
+	var k = 10*amount/(1-amount);
+	for(var i=0; i<44100;i++){
+        var x = (i) * (2) / (44100)-1;
+        curve[i] = (1 + k) * x / (1+k * Math.abs(x));
+	}
+return curve;
+}
 
-function bandPassFilter(input, bandf, bandq, ac){
+
+Graph.prototype.bandPassFilter=function(input, bandf, bandq){
 	//Bandpass Filter
 	if(bandf>0 && bandf<1 && bandq>0){
-			filterNode = ac.createBiquadFilter();
+			filterNode = this.ac.createBiquadFilter();
 			filterNode.type = 'bandpass';
 			filterNode.frequency.value = bandf*10000;
 			filterNode.Q.value = bandq;
@@ -314,19 +310,19 @@ function bandPassFilter(input, bandf, bandq, ac){
 	else return input;
 }
 
-function highPassFilter (input, hcutoff, hresonance, ac){
+Graph.prototype.highPassFilter = function (input, hcutoff, hresonance){
 	
 	if(hresonance>0 && hresonance<1 && hcutoff>0 && hcutoff<1){
 			//Filtering
-			filterNode = ac.createBiquadFilter();
+			filterNode = this.ac.createBiquadFilter();
 			filterNode.type = 'highpass';
 			filterNode.frequency.value = hcutoff*10000;
 			filterNode.Q.value = 0.1;
 			input.connect(filterNode);
 			input = filterNode;
 
-			//Resonance
-			filterNode = ac.createBiquadFilter();
+			//Resonance@
+			filterNode = this.ac.createBiquadFilter();
 			filterNode.type = 'peaking';
 			filterNode.frequency.value = hcutoff*10000+100;
 			filterNode.Q.value=70;
@@ -340,11 +336,11 @@ function highPassFilter (input, hcutoff, hresonance, ac){
 }
 
 
-function lowPassFilter(input, cutoff, resonance, ac){
+Graph.prototype.lowPassFilter = function(input, cutoff, resonance){
 
 	if(resonance>0 && resonance<=1 && cutoff>0 && cutoff<=1){
 
-			var filterNode = ac.createBiquadFilter();
+			var filterNode = this.ac.createBiquadFilter();
 			filterNode.type = 'lowpass';
 			filterNode.frequency.value = cutoff*14000;
 			filterNode.Q.value = 0.1;
@@ -352,7 +348,7 @@ function lowPassFilter(input, cutoff, resonance, ac){
 			input.connect(filterNode);
 			input = filterNode;
 
-			filterNode = ac.createBiquadFilter();
+			filterNode = this.ac.createBiquadFilter();
 			filterNode.type = 'peaking';
 			filterNode.frequency.value = cutoff*1400+100;
 			filterNode.Q.value=70;
@@ -364,17 +360,17 @@ function lowPassFilter(input, cutoff, resonance, ac){
 
 }
 
-function shape(input, shape, ac){
+Graph.prototype.shape = function (input, shape){
 	if (isNaN(parseInt(shape)))return input;
 
 	if(shape!=0) {
 		//Distortion limited to [0,1]
 		if (Math.abs(shape)>1) shape=1;
 		else shape=Math.abs(shape);
-		var distortionNode = ac.createWaveShaper();
+		var distortionNode = this.ac.createWaveShaper();
 
 		//@Change makeDistortion Curve?
-		distortionNode.curve = makeDistortionCurve(shape*300);
+		distortionNode.curve = makeDistortionCurve(shape);
 		distortionNode.oversample = '2x';
 
 		//Connect Distortion to last, and pass on 'last'
@@ -385,10 +381,63 @@ function shape(input, shape, ac){
 		return input;
 }
 
+
+
+
+//Vowel effect
+//@ get frequencies from superdirt
+Graph.prototype.vowel= function (input, vowel){
+	if (vowel=='a'||vowel=='e'||vowel=='i'||vowel=='o'||vowel=='u'){
+			var frequencies;
+			var q = [5/20,20/20,50/20];
+			var gain= this.ac.createGain();
+
+			switch (vowel){
+				case('a'):
+					frequencies= [730,1090,2440];
+					break
+				case('e'):
+					frequencies = [270,2290,3010];
+					break
+				case('i'):
+					frequencies = [390, 1990,2550];
+					break;
+				case('o'):
+					frequencies = [360,1390, 1090];
+					break;
+				case('u'):
+					frequencies = [520,1190, 2390];
+			}
+			for(var i=0; i<3; i++){
+				filterNode = this.ac.createBiquadFilter()
+				filterNode.type = 'bandpass'
+				filterNode.Q.value=1;
+				filterNode.frequency.value=frequencies[i];
+
+				input.connect(filterNode);
+				//temp.connect(gain);
+				input=filterNode;
+			}
+			var makeupGain = this.ac.createGain();
+			makeupGain.gain.value=20;
+			filterNode.connect(makeupGain);
+			return makeupGain;
+	}
+	else return input
+}
+
+
+
+
+
+/* Some older functions for effects, may want to refer back to them eventually
+
+
+
 //Returns a new BufferSourceNode containing a buffer with the reversed frames of the
 //parameter 'buffer'
 //@add add more for multi-channel samples
-function reverseBuffer(buffer,ac){
+Graph.prototype.reverseBuffer= function(buffer){
 	var frames = buffer.length;
 	var pcmData = new Float32Array(frames);
 	var newBuffer = ac.createBuffer(buffer.numberOfChannels,buffer.length,ac.sampleRate);
@@ -412,11 +461,11 @@ function reverseBuffer(buffer,ac){
 
 //Returns BufferSourceNode with a sped up buffer. Volume of samples given a high speed parameter (>~4) is
 //better preserved using this function rather than simply altering the playbackRate of the buffer.
-function speed(buffer,rate,ac){
+function speed(buffer,rate){
 	var frames = buffer.length;
 	var pcmData = new Float32Array(frames);
-	var newBuffer = ac.createBuffer(buffer.numberOfChannels,Math.trunc(buffer.length/rate),ac.sampleRate);
-	var newsource = ac.createBufferSource();
+	var newBuffer = this.ac.createBuffer(buffer.numberOfChannels,Math.trunc(buffer.length/rate),ac.sampleRate);
+	var newsource = this.ac.createBufferSource();
 	var newChannelData = new Float32Array(newBuffer.length);
 	buffer.copyFromChannel(pcmData,0,0);
 
@@ -430,106 +479,6 @@ function speed(buffer,rate,ac){
 	return newsource;
 
 }
-
-//Vowel effect
-//@ get frequencies from superdirt
-function vowel (input, vowel, ac){
-	if (vowel=='a'||vowel=='e'||vowel=='i'||vowel=='o'||vowel=='u'){
-			var frequencies;
-			var q = [5/20,20/20,50/20];
-			var gain= ac.createGain();
-
-			switch (vowel){
-				case('a'):
-					frequencies= [730,1090,2440];
-					break
-				case('e'):
-					frequencies = [270,2290,3010];
-					break
-				case('i'):
-					frequencies = [390, 1990,2550];
-					break;
-				case('o'):
-					frequencies = [360,1390, 1090];
-					break;
-				case('u'):
-					frequencies = [520,1190, 2390];
-			}
-			for(var i=0; i<3; i++){
-				filterNode = ac.createBiquadFilter()
-				filterNode.type = 'bandpass'
-				filterNode.Q.value=1;
-				filterNode.frequency.value=frequencies[i];
-
-				input.connect(filterNode);
-				//temp.connect(gain);
-				input=filterNode;
-			}
-			var makeupGain = ac.createGain();
-			makeupGain.gain.value=20;
-			filterNode.connect(makeupGain);
-			return makeupGain;
-	}
-	else return input
-}
-
-
-
-
-
-
-/* Some older functions for effects, may want to refer back to them eventually
-
-
-
-//@ is the scriptNode handler continuously called even after it has finished playing?
-//how to stop that?
-function otherCoarse (input, coarse, ac){
-	//Safety and msg parsing
-	if(isNaN(parseInt(coarse))) coarse = 1;
-	coarse=Math.abs(coarse);
-
-	var coarseNode;
-	//If coarse is valid, coarseNode becomes last with coarseNode effect
-	//otherwise, coarseNode becomes last 		
-	if(coarse>1){
-	var scriptNode = ac.createScriptProcessor();
-	scriptNode.onaudioprocess = function(audioProcessingEvent){
-		var inputBuffer = audioProcessingEvent.inputBuffer;
-	
-		var outputBuffer = audioProcessingEvent.outputBuffer;
-
-		for (var channel=0;channel<outputBuffer.numberOfChannels; channel++){
-			var inputData = inputBuffer.getChannelData(channel);
-			var outputData = outputBuffer.getChannelData(channel);
-			for(var frame=0; frame<inputBuffer.length; frame++){
-				if(frame%coarse==0) outputData[frame]=inputData[frame];
-				else outputData[frame]=outputData[frame-1];	
-			}//Frames
-		}//Channels
-		console.log("infinite loop in otherCoarse, scriptNode handler")
-	}//end scriptNode audio processing handler 
-
-	input.connect(scriptNode);
-	input.onended= function(){input.disconnect(scriptNode)};
-	return scriptNode;
-	}
-	else 
-		return input
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 //Used for coarse effect
 function decimate(buffer,rate,ac){
