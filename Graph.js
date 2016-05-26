@@ -14,8 +14,9 @@ function Graph(msg,ac,sampleBank){
 	if(isNaN(parseInt(msg.speed))) msg.speed = 1;
 	if(msg.speed>=0 && buffer != null) this.source.buffer = buffer;
 	if(msg.speed<0 && buffer != null) {
-		this.source.buffer=buffer;
-		last = this.reverse(last)
+		try{
+		this.source.buffer=this.reverseBuffer(buffer)
+	}catch(e){console.log(e)}
 	}
 	this.source.playbackRate.value=Math.abs(msg.speed);
 	if(buffer != null) this.start();
@@ -150,34 +151,31 @@ function otherAccelerate(buffer, accelerate, ac){
 }
 
 
-//@ is the scriptNode handler continuously called even after it has finished playing?
-//how to stop that?
-Graph.prototype.reverse = function(input){
+//Returns a new BufferSourceNode containing a buffer with the reversed frames of the
+//parameter 'buffer'
+//@add add more for multi-channel samples
+Graph.prototype.reverseBuffer= function(buffer){
+	var frames = buffer.length;
+	var pcmData = new Float32Array(frames);
+	var newBuffer = this.ac.createBuffer(buffer.numberOfChannels,buffer.length,this.ac.sampleRate);
+	// var source = ac.createBufferSource();
+	var newChannelData = new Float32Array(frames);
 
-	var scriptNode = this.ac.createScriptProcessor();
-	input.connect(scriptNode);
+	buffer.copyFromChannel(pcmData,0,0);
+	for (var i =0;i<frames;i++){
+		newChannelData[i]=pcmData[frames-i];
+	}
+	//First element of newChannelData will be set to NaN - causes clipping on first frame
+	//set to send element to get rid of clipping
+	newChannelData[0]=newChannelData[1];
+	newBuffer.copyToChannel(newChannelData,0,0);
 
-	scriptNode.onaudioprocess = function(audioProcessingEvent){
-		var inputBuffer = audioProcessingEvent.inputBuffer;
-		var outputBuffer = audioProcessingEvent.outputBuffer;
-		for (var channel=0;channel<outputBuffer.numberOfChannels; channel++){
-			var inputData = inputBuffer.getChannelData(channel);
-			var outputData = outputBuffer.getChannelData(channel);
-			for(var frame=0; frame<inputBuffer.length; frame++){
-				outputData[frame]= inputData[inputBuffer.length-frame];
-			}//Frames
-		}//Channels
-		//return outputBuffer
-			console.log("reverse handler")
-	}//end scriptNode audio processing handler
+	return newBuffer;
 
-	//Defines a function to disconnect the script processor node
-	//if a reverse effect is added (called in onended funciton of this.source)
-	this.disconnectOnEnd(input,scriptNode);
-	this.disconnectOnEnd(scriptNode);
-
-	return scriptNode;
+//	source.buffer = newBuffer;
+//	return source;
 }
+
 
 Graph.prototype.disconnectOnEnd = function(x,y) {
 	console.log("disconnectOnEnd");
