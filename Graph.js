@@ -4,10 +4,11 @@ function Graph(msg,ac,sampleBank){
 	this.ac = ac;
 	var last,temp;
 	this.when = msg.when;
+
 	// get basic buffer player, including speed change and sample reversal
 	this.source = last = ac.createBufferSource();
-	if(typeof msg.begin != 'number') msg.begin = 0;
-	if(typeof msg.end != 'number') msg.end = 1;
+	if(isNaN(parseInt(msg.begin))) msg.begin = 0;
+	if(isNaN(parseInt(msg.end))) msg.end = 1;
 	this.begin = msg.begin;
 	this.end = msg.end;
 	var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
@@ -71,8 +72,8 @@ function Graph(msg,ac,sampleBank){
 	// Delay
 	last = this.delay(last,msg.delay,msg.delaytime,msg.delayfeedback);
 
-	//Sample Loop (not yet working)
-	//last = this.loop(last, msg.loop, msg.begin, msg.end);
+	//Loop
+	last = this.loop(last, msg.loop, msg.begin, msg.end, msg.speed);
 	
 	//Coarse
 	last = this.coarse(last, msg.coarse);
@@ -214,7 +215,7 @@ Graph.prototype.crush = function(input, crush){
 
 		this.disconnectOnEnd(input,scriptNode);
 		this.disconnectOnEnd(scriptNode);
-
+		console.log("crush handler")
 	return scriptNode;
 	}
 	else{
@@ -262,6 +263,7 @@ Graph.prototype.coarse = function(input, coarse){
 
 Graph.prototype.start = function() {
 	console.log("start")
+	//#@
 	this.source.start(0,this.begin*this.source.buffer.duration,this.end*this.source.buffer.duration);
 }
 
@@ -295,41 +297,17 @@ Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
 }
 
 //In progress...
-Graph.prototype.loop = function(input, loopCount, begin, end){
+Graph.prototype.loop = function(input, loopCount){
 
 	if(isNaN(parseInt(loopCount)) || loopCount==0) return input
 
-	var looped = this.ac.createDelay();
-	begin=0;
-	end=1;
-	console.log(this.source.buffer.duration)
-	try{
-	//	looped.delayTime.value = (this.source.buffer.duration-begin*this.source.buffer.duration-(1-end))/this.source.playbackRate.value
-		looped.delayTime.value = this.source.buffer.duration;
-		var gain = this.ac.createGain()
-		gain.gain.value = 1
-		var gain2 = this.ac.createGain();
-		gain2.gain.value =1;
-		gain.gain.setValueAtTime(0,this.ac.currentTime+this.source.buffer.duration*loopCount)
-		console.log(this.ac.currentTime+this.source.buffer.duration*loopCount)
+	var dur = this.source.buffer.duration-(this.begin*this.source.buffer.duration)-((1-this.end)*this.source.buffer.duration);
+	this.source.loop=true;
+	this.source.loopStart = this.begin*this.source.buffer.duration
+	this.source.loopEnd = this.end*this.source.buffer.duration
+	this.source.stop(this.ac.currentTime+(dur*loopCount)/this.source.playbackRate.value);
 
-		input.connect(looped);
-		looped.connect(gain);
-		looped.connect(gain2);
-		gain.connect(looped);
-	}
-	catch(e){console.log(e.stack)}
-
-		return gain2;
-// var gain = this.ac.createGain();
-	// gain.gain.value =1
-	// gain.gain.setValueAtTime(0,this.ac.currentTime+this.source.buffer.duration*loopCount);
-	// this.source.loop=true;
-	// this.source.loopStart = begin*this.source.buffer.duration
-	// this.source.loopEnd = end*this.source.buffer.duration
-	// input.connect(gain)
-
-
+	return input;
 }
 
 //@Refine/differentiate?

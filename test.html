@@ -64,6 +64,8 @@ WebDirt.prototype.testComplexMessage = function() {
   msg.delaytime = document.getElementById('delaytime').value;
   msg.delayfeedback = document.getElementById('delayfeedback').value;
   msg.loop = document.getElementById('loop').value;
+  msg.begin = document.getElementById('begin').value;
+  msg.end = document.getElementById('end').value;
 
   msg.when = this.ac.currentTime+0.5;
   this.queue(msg);
@@ -97,6 +99,8 @@ WebDirt.prototype.testComplexMessage = function() {
     <div>delaytime: <textarea id="delaytime"></textarea></div>
     <div>delayfeedback: <textarea id="delayfeedback"></textarea></div>
     <div>loop: <textarea id="loop"></textarea></div>
+     <div>begin: <textarea id="begin"></textarea></div>
+    <div>end: <textarea id="end"></textarea></div>
 
 
     <button onclick="webDirt.testComplexMessage()">testComplexMessage</button>
