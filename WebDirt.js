@@ -62,7 +62,7 @@ WebDirt.prototype.subscribeToTidalSocket = function(url,withLog) {
     if(msg.address == null) throw Error("received message from tidalSocket with no address: " + m.data);
     else if(msg.address != "/play") throw Error("address of message from tidalSocket wasn't /play: " + m.data);
     else if(msg.args.constructor !== Array) throw Error("ERROR: message from tidalSocket where args doesn't exist or isn't an array: " + m.data);
-    else if(msg.args.length != 30) throw Error("ERROR: message from tidalSocket with " + msg.args.length + " args instead of 30: " + m.data);
+    else if(msg.args.length != 30 && msg.args.length != 33) throw Error("ERROR: message from tidalSocket with " + msg.args.length + " args instead of 30 or 33: " + m.data);
     else {
       var x = {};
       var diff = Date.now()/1000 - closure.ac.currentTime;
@@ -95,6 +95,11 @@ WebDirt.prototype.subscribeToTidalSocket = function(url,withLog) {
       x.sample_loop = msg.args[28];
       x.sample_n = msg.args[29];
 
+      if(msg.args.length = 33) {
+        x.attack = msg.args[30];
+        x.hold = msg.args[31];
+        x.release = msg.args[32];
+      }
 
       closure.queue(x);
       if(withLog)console.log(msg);
