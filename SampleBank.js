@@ -29,6 +29,7 @@ SampleBank.prototype.loadAllNamed = function(name) {
 
 // loads an individual sample
 SampleBank.prototype.load = function(name,number) {
+  if(number == null) number = 0;
   if(this.sampleMap == null) throw Error("SampleBank.load: sampleMap is null");
   if(this.sampleMap[name] == null) throw Error("SampleBank.load: no sampleMap for " + name);
   if(number >= this.sampleMap[name].length) throw Error("SampleBank.load: number > number of samples");
@@ -69,6 +70,7 @@ SampleBank.prototype.load = function(name,number) {
 }
 
 SampleBank.prototype.getBuffer = function(name,number) {
+  if(number == null) number = 0;
   if(this.sampleMap == null) throw Error("SampleBank.getBuffer: sampleMap is null");
   if(this.sampleMap[name] == null) throw Error("SampleBank.getBuffer: no sampleMap for " + name);
   number = number % this.sampleMap[name].length;
