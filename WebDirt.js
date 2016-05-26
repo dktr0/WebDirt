@@ -1,4 +1,8 @@
-WebDirt = function() {
+WebDirt = function(sampleMapUrl,sampleFolder) {
+  if(sampleMapUrl == null) sampleMapUrl = "sampleMap.json";
+  if(sampleFolder == null) sampleFolder = "samples";
+  this.sampleMapUrl = sampleMapUrl;
+  this.sampleFolder = sampleFolder;
   window.AudioContext = window.AudioContext || window.webkitAudioContext;
   try {
     this.ac = new AudioContext();
@@ -7,7 +11,7 @@ WebDirt = function() {
   catch(e) {
     alert('Web Audio API is not supported in this browser');
   }
-  this.sampleBank = new SampleBank('sampleMap.json','samples',this.ac);
+  this.sampleBank = new SampleBank(this.sampleMapUrl,this.sampleFolder,this.ac);
 }
 
 WebDirt.prototype.queue = function(msg) {
@@ -47,7 +51,7 @@ WebDirt.prototype.loadAndPlayScore = function(url) {
 WebDirt.prototype.subscribeToTidalSocket = function(url,withLog) {
   if(withLog == null)withLog = false;
   window.WebSocket = window.WebSocket || window.MozWebSocket;
-  console.log("attempting websocket connection to " + url);
+  console.log("WebDirt: attempting websocket connection to " + url);
   ws = new WebSocket(url);
   ws.onopen = function () { console.log("websocket connection to tidalSocket opened"); };
   ws.onerror = function () { console.log("ERROR opening websocket connection to tidalSocket"); };
