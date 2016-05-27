@@ -29,7 +29,8 @@ WebDirt.prototype.queue = function(msg) {
 WebDirt.prototype.playScore = function(score) {
   // where score is an array of message objects (each of which fulfills same expectations as the method 'queue' above)
   var start = this.ac.currentTime + this.latency;
-  for(let msg of score) {
+  for(var i in score) {
+    var msg = score[i];
     msg.when = msg.when + start;
     // begin: a temporary kludge
     msg.sample_name = msg.s;
