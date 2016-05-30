@@ -1,25 +1,41 @@
-WebDirt = function(sampleMapUrl,sampleFolder,latency) {
+WebDirt = function(sampleMapUrl,sampleFolder,latency,callbackWhenReady) {
   if(sampleMapUrl == null) sampleMapUrl = "sampleMap.json";
   if(sampleFolder == null) sampleFolder = "samples";
   if(latency == null) latency = 0.2;
   this.latency = latency;
   this.sampleMapUrl = sampleMapUrl;
   this.sampleFolder = sampleFolder;
+  this.sampleBank = new SampleBank(this.sampleMapUrl,this.sampleFolder,callbackWhenReady);
+}
+
+// note: the constructor above does not initialize the Web Audio context.
+// this is deliberate in order to support the way things work on iOS, where
+// the audio context must be initialized in response to a user interaction.
+// each of the methods below the next method (queue, playScore, playScoreWhenReady,
+// loadAndPlayScore,subscribeToTidalSocket) call initializeWebAudio (which has
+// been written to only allow itself to run once) so it is _not_ expected that you call
+// initializeWebAudio yourself. However, for things to work on iOS, you should
+// make sure that that initializeWebAudio is called from a user interaction
+// before any other potential calls to initializeWebAudio.
+
+WebDirt.prototype.initializeWebAudio = function() {
+  if(this.ac != null) return;
   window.AudioContext = window.AudioContext || window.webkitAudioContext;
   try {
     this.ac = new AudioContext();
     this.clockDiff = Date.now()/1000 - this.ac.currentTime;
+    this.sampleBank.ac = this.ac;
     console.log("WebDirt audio context created");
   }
   catch(e) {
     alert('Web Audio API is not supported in this browser');
   }
-  this.sampleBank = new SampleBank(this.sampleMapUrl,this.sampleFolder,this.ac);
 }
 
 WebDirt.prototype.queue = function(msg,latency) {
+  this.initializeWebAudio();
   if(latency == null) latency = this.latency;
-	if(msg.when==null) throw Error ("Sample given no 'when' parameter");
+	if(msg.when==null) msg.when = this.ac.currentTime; // a sample without a 'when' is played 'now'(+latency)
   msg.when = msg.when + latency;
   if(msg.when < this.ac.currentTime) {
     console.log("WebDirt warning: msg late by " + (this.ac.currentTime-msg.when) + " seconds" );
@@ -30,6 +46,7 @@ WebDirt.prototype.queue = function(msg,latency) {
 WebDirt.prototype.playScore = function(score,latency) {
   // where score is an array of message objects (each of which fulfills same expectations as the method 'queue' above)
   // if no second argument (latency) is given, then latency defaults to latency default of this WebDirt instance
+  this.initializeWebAudio();
   if(latency == null) latency = this.latency;
   var start = this.ac.currentTime;
   for(var i in score) {
@@ -45,6 +62,7 @@ WebDirt.prototype.playScore = function(score,latency) {
 }
 
 WebDirt.prototype.playScoreWhenReady = function(score,latency) {
+  this.initializeWebAudio();
   if(latency == null) latency = this.latency;
   var count = score.length;
   for(var i in score) {
@@ -62,6 +80,7 @@ WebDirt.prototype.playScoreWhenReady = function(score,latency) {
 }
 
 WebDirt.prototype.loadAndPlayScore = function(url,latency) {
+  this.initializeWebAudio();
   if(latency == null) latency = this.latency;
   var request = new XMLHttpRequest();
   request.open('GET',url,true);
@@ -78,6 +97,7 @@ WebDirt.prototype.loadAndPlayScore = function(url,latency) {
 }
 
 WebDirt.prototype.subscribeToTidalSocket = function(url,withLog) {
+  this.initializeWebAudio();
   if(withLog == null)withLog = false;
   window.WebSocket = window.WebSocket || window.MozWebSocket;
   console.log("WebDirt: attempting websocket connection to " + url);
