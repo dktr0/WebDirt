@@ -9,7 +9,9 @@
 var webDirt;
 
 function onload() {
-  webDirt = new WebDirt();
+  webDirt = new WebDirt(null,null,null,function() {
+    console.log("callback from WebDirt constructor completed");
+  });
 }
 
 WebDirt.prototype.testWebAudioIsWorking = function() {
