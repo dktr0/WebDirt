@@ -4,7 +4,7 @@
 // so before doing anything with a newly created SampleBank object you should set it's property ac to
 // a valid audio context.
 
-SampleBank = function(sampleMapUrl,urlPrefix,callbackWhenReady) {
+SampleBank = function(sampleMapUrl,urlPrefix,readyCallback) {
   this.sampleMapUrl = sampleMapUrl;
   this.urlPrefix = urlPrefix;
   this.samples = {};
@@ -19,7 +19,7 @@ SampleBank = function(sampleMapUrl,urlPrefix,callbackWhenReady) {
     if(request.response == null) throw Error("JSON response null in callback of sampleMap load");
     closure.sampleMap = request.response;
     console.log("sampleMap loaded from " + closure.sampleMapUrl);
-    if(typeof callbackWhenReady == 'function')callbackWhenReady();
+    if(typeof readyCallback == 'function')readyCallback();
   };
   request.send();
 }

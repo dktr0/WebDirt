@@ -37,9 +37,7 @@ WebDirt.prototype.queue = function(msg,latency) {
   if(latency == null) latency = this.latency;
 	if(msg.when==null) msg.when = this.ac.currentTime; // a sample without a 'when' is played 'now'(+latency)
   msg.when = msg.when + latency;
-  if(msg.when < this.ac.currentTime) {
-    console.log("WebDirt warning: msg late by " + (this.ac.currentTime-msg.when) + " seconds" );
-  }
+  if(msg.when < this.ac.currentTime) console.log("WebDirt warning: late by " + (this.ac.currentTime-msg.when) + " seconds" );
   var graph = new Graph(msg,this.ac,this.sampleBank);
 }
 
