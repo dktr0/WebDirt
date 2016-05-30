@@ -53,7 +53,7 @@ WebDirt.prototype.playScore = function(score,latency) {
     var msg = score[i];
     msg.when = msg.when + start;
     // begin: a temporary kludge
-    msg.sample_name = msg.s;
+    if(msg.s != null) msg.sample_name = msg.s;
     if(msg.n != null) msg.sample_n = msg.n;
     // end: a temporary kludge
     this.sampleBank.load(msg.sample_name,msg.sample_n); // make an early attempt to load samples, ahead of playback
@@ -69,7 +69,7 @@ WebDirt.prototype.playScoreWhenReady = function(score,latency) {
     var msg = score[i];
     var closure = this;
     // begin: a temporary kludge
-    msg.sample_name = msg.s;
+    if(msg.s != null) msg.sample_name = msg.s;
     if(msg.n != null) msg.sample_n = msg.n;
     // end: a temporary kludge
     this.sampleBank.load(msg.sample_name,msg.sample_n,function() {
