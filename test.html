@@ -50,7 +50,6 @@ WebDirt.prototype.testComplexMessage = function() {
   msg.sample_name = document.getElementById('sample_name').value;
   msg.sample_n = document.getElementById('sample_n').value;
   msg.speed = document.getElementById('speed').value;
-  console.log("msg.speed in test.html is " + msg.speed);
   msg.cutoff = document.getElementById('cutoff').value;
   msg.resonance = document.getElementById('resonance').value;
   msg.accelerate = document.getElementById('accelerate').value;
@@ -64,6 +63,13 @@ WebDirt.prototype.testComplexMessage = function() {
   msg.crush = document.getElementById('crush').value;
   msg.pan = document.getElementById('pan').value;
   msg.gain = document.getElementById('gain').value;
+  msg.delay = document.getElementById('delay').value;
+  msg.delaytime = document.getElementById('delaytime').value;
+  msg.delayfeedback = document.getElementById('delayfeedback').value;
+  msg.loop = document.getElementById('loop').value;
+  msg.begin = document.getElementById('begin').value;
+  msg.end = document.getElementById('end').value;
+
   msg.when = this.ac.currentTime+0.5;
   this.queue(msg);
 }
@@ -92,6 +98,13 @@ WebDirt.prototype.testComplexMessage = function() {
     <div>crush: <textarea id="crush"></textarea></div>
     <div>pan: <textarea id="pan"></textarea></div>
     <div>gain: <textarea id="gain"></textarea></div>
+    <div>delay: <textarea id="delay"></textarea></div>
+    <div>delaytime: <textarea id="delaytime"></textarea></div>
+    <div>delayfeedback: <textarea id="delayfeedback"></textarea></div>
+    <div>loop: <textarea id="loop"></textarea></div>
+     <div>begin: <textarea id="begin"></textarea></div>
+    <div>end: <textarea id="end"></textarea></div>
+
 
     <button onclick="webDirt.testComplexMessage()">testComplexMessage</button>
   </div>

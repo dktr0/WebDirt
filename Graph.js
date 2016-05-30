@@ -4,18 +4,20 @@ function Graph(msg,ac,sampleBank){
 	this.ac = ac;
 	var last,temp;
 	this.when = msg.when;
+
 	// get basic buffer player, including speed change and sample reversal
 	this.source = last = ac.createBufferSource();
-	if(typeof msg.begin != 'number') msg.begin = 0;
-	if(typeof msg.end != 'number') msg.end = 1;
+	if(isNaN(parseInt(msg.begin))) msg.begin = 0;
+	if(isNaN(parseInt(msg.end))) msg.end = 1;
 	this.begin = msg.begin;
 	this.end = msg.end;
 	var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
 	if(isNaN(parseInt(msg.speed))) msg.speed = 1;
 	if(msg.speed>=0 && buffer != null) this.source.buffer = buffer;
 	if(msg.speed<0 && buffer != null) {
-		this.source.buffer=buffer;
-		last = this.reverse(last)
+		try{
+		this.source.buffer=this.reverseBuffer(buffer)
+	}catch(e){console.log(e)}
 	}
 	this.source.playbackRate.value=Math.abs(msg.speed);
 	if(buffer != null) this.start();
@@ -41,17 +43,12 @@ function Graph(msg,ac,sampleBank){
 			if(x.output == null) x.input.disconnect();
 			else x.input.disconnect(x.output);
 		}
+		try{console.log("hmm");}catch (e){console.log(e)}
+		this.source.buffer.defaultPlayBackRate.value =1
 	}
 
-	// Accelerate
-	if(isNaN(parseInt(msg.accelerate))) msg.accelerate = 0;
-	if(msg.accelerate!=0){
-		last = otherAccelerate(this.source.buffer, msg.accelerate, ac)
-		last.connect(ac.destination)
-		last.start(0)
-		return
-	}
 
+	this.accelerate(msg.accelerate);
 
 	// Distortion
 	last = this.shape(last, msg.shape);
@@ -71,15 +68,9 @@ function Graph(msg,ac,sampleBank){
 	// Delay
 	last = this.delay(last,msg.delay,msg.delaytime,msg.delayfeedback);
 
-	//Samle_loop
-	/* if (msg.sample_loop>0){
-		last.loop=true;
-		console.log(last.loop)
-		last.connect(ac.destination)
-		this.source.start(0)
-		return
-	} */
-
+	//Loop
+	last = this.loop(last, msg.loop, msg.begin, msg.end, msg.speed);
+	
 	//Coarse
 	last = this.coarse(last, msg.coarse);
 
@@ -87,24 +78,23 @@ function Graph(msg,ac,sampleBank){
 	last = this.crush(last, msg.crush);
 
 
+
 	//Gain
 	if(isNaN(parseInt(msg.gain))) msg.gain = 1;
 	var gain = ac.createGain();
-	gain.gain.value = Math.abs(Math.pow(msg.gain/2,4));
+	gain.gain.value = Math.abs(Math.pow(msg.gain,4));
 	last.connect(gain);
 	var last = gain;
-
 
 	//Panning (currently stereo)
 	if(isNaN(parseInt(msg.pan))) msg.pan = 0.5;
 	var gain1 = ac.createGain();
 	var gain2 = ac.createGain();
 
-	//gain1.gain.value= (-1)*Math.pow((1-msg.pan) -1,2)+0.5;
-	//gain2.gain.value=(-1)*Math.pow(msg.pan-1,2)+0.5;;
-	 gain1.gain.value =1-msg.pan;
-	 gain2.gain.value= msg.pan;
-	// @should do equal power panning or something like that instead, i.e. +3 dB as becomes centre-panned
+	//Equal power panning @
+	gain1.gain.value = Math.cos(msg.pan*Math.PI/2);
+	gain2.gain.value = Math.sin(msg.pan*Math.PI/2);
+
 	last.connect(gain1);
 	last.connect(gain2);
 	var channelMerger = ac.createChannelMerger(2);
@@ -112,78 +102,54 @@ function Graph(msg,ac,sampleBank){
 	gain2.connect(channelMerger,0,1);
 	channelMerger.connect(ac.destination);
 
-
 }
 
 
-//Accelerate
-function accelerate (accelerate, ac){
-	var scriptNode = this.ac.createScriptProcessor();
+//Accelerate @Still working on negative values
+Graph.prototype.accelerate = function(accelerateValue){
+	if(isNaN(parseInt(accelerateValue))) accelerateValue = 0;
+	if(accelerateValue!=0){
 
-	scriptNode.onaudioprocess = function(audioProcessingEvent){
-		var inputBuffer = audioProcessingEvent.inputBuffer;
-		var ouputBuffer = audioProcessingEvent.outputBuffer;
-		for (var channel = 0; channel <inputBuffer.numberOfChannels; channel++){
-			var inputData = inputBuffer.getChannelData(channel);
-			var outputData = outputBuffer.getChannelData(channel);
-			for(var frame = 0; accelerate*frame <inputBuffer.length; frame++){
-				outputData[frame] = inputData[frame*accelerate];
+		try{
+			if(this.source.buffer.length*(accelerateValue)/this.ac.sampleRate,this.ac.currentTime<0){
+				this.source.playbackRate.setTargetAtTime(0.00001,this.ac.currentTime,this.source.buffer.duration*2);
 			}
+			else
+			this.source.playbackRate.setTargetAtTime(this.source.buffer.length*(accelerateValue)/this.ac.sampleRate,this.ac.currentTime,this.source.buffer.duration*2);
+
+		}catch(e){
+			console.log(e)
 		}
 	}
 
-	return scriptNode
 }
 
 
-//Accelerate
-function otherAccelerate(buffer, accelerate, ac){
+//Returns a new BufferSourceNode containing a buffer with the reversed frames of the
+//parameter 'buffer'
+//@add add more for multi-channel samples
+Graph.prototype.reverseBuffer= function(buffer){
 	var frames = buffer.length;
 	var pcmData = new Float32Array(frames);
-	var newBuffer = ac.createBuffer(buffer.numberOfChannels,buffer.length,ac.sampleRate);
-	var source = ac.createBufferSource();
+	var newBuffer = this.ac.createBuffer(buffer.numberOfChannels,buffer.length,this.ac.sampleRate);
+	// var source = ac.createBufferSource();
 	var newChannelData = new Float32Array(frames);
+
 	buffer.copyFromChannel(pcmData,0,0);
-
-	for(var frame = 0; frame <buffer.length; frame++){
-		newChannelData[frame] = pcmData[Math.round((frame*accelerate*frame))/19];
+	for (var i =0;i<frames;i++){
+		newChannelData[i]=pcmData[frames-i];
 	}
-
+	//First element of newChannelData will be set to NaN - causes clipping on first frame
+	//set to send element to get rid of clipping
+	newChannelData[0]=newChannelData[1];
 	newBuffer.copyToChannel(newChannelData,0,0);
-	source.buffer = newBuffer;
 
-	return source;
+	return newBuffer;
+
+//	source.buffer = newBuffer;
+//	return source;
 }
 
-
-//@ is the scriptNode handler continuously called even after it has finished playing?
-//how to stop that?
-Graph.prototype.reverse = function(input){
-
-	var scriptNode = this.ac.createScriptProcessor();
-	input.connect(scriptNode);
-
-	scriptNode.onaudioprocess = function(audioProcessingEvent){
-		var inputBuffer = audioProcessingEvent.inputBuffer;
-		var outputBuffer = audioProcessingEvent.outputBuffer;
-		for (var channel=0;channel<outputBuffer.numberOfChannels; channel++){
-			var inputData = inputBuffer.getChannelData(channel);
-			var outputData = outputBuffer.getChannelData(channel);
-			for(var frame=0; frame<inputBuffer.length; frame++){
-				outputData[frame]= inputData[inputBuffer.length-frame];
-			}//Frames
-		}//Channels
-		//return outputBuffer
-			console.log("reverse handler")
-	}//end scriptNode audio processing handler
-
-	//Defines a function to disconnect the script processor node
-	//if a reverse effect is added (called in onended funciton of this.source)
-	this.disconnectOnEnd(input,scriptNode);
-	this.disconnectOnEnd(scriptNode);
-
-	return scriptNode;
-}
 
 Graph.prototype.disconnectOnEnd = function(x,y) {
 	console.log("disconnectOnEnd");
@@ -217,18 +183,12 @@ Graph.prototype.crush = function(input, crush){
 		}//end scriptNode audio processing handler
 
 		input.connect(scriptNode);
-		//Defines a function to disconnect the script processor node
-		//if a crush effect is added (called in onended funciton of this.source)
-
 		this.disconnectOnEnd(input,scriptNode);
 		this.disconnectOnEnd(scriptNode);
-
 	return scriptNode;
 	}
-	else{
+	else
 		return input
-
-	}
 }//End Crush
 
 //Coarse Effect
@@ -257,10 +217,8 @@ Graph.prototype.coarse = function(input, coarse){
 		}//end scriptNode audio processing handler
 
 		input.connect(scriptNode);
-
 		this.disconnectOnEnd(input,scriptNode);
 		this.disconnectOnEnd(scriptNode);
-
 		return scriptNode;
 	}
 	else
@@ -269,11 +227,10 @@ Graph.prototype.coarse = function(input, coarse){
 
 
 Graph.prototype.start = function() {
-	// console.log("start")
 	this.source.start(this.when,this.begin*this.source.buffer.duration,this.end*this.source.buffer.duration);
 }
 
-
+//@gain on first hit of something with a delay
 Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
 	console.log(outputGain)
 	if(isNaN(parseInt(outputGain))) outputGain = 0;
@@ -290,17 +247,30 @@ Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
 			console.log("warning: delayfeedback not a number, using default of 0.5");
 			delayFeedback = 0.5;
 		}
-		try{
 		feedBackGain.gain.value= delayFeedback;
 		var delayGain = this.ac.createGain();
 		delayGain.gain.value = outputGain;
 		input.connect(delayNode);
 		delayNode.connect(feedBackGain);
 		delayNode.connect(delayGain);
-		feedBackGain.connect(delayNode);}catch(e){console.log(e)}
+		feedBackGain.connect(delayNode);
 		return delayGain;
 	}
 	else return input;
+}
+
+//In progress...
+Graph.prototype.loop = function(input, loopCount){
+
+	if(isNaN(parseInt(loopCount)) || loopCount==0) return input
+
+	var dur = this.source.buffer.duration-(this.begin*this.source.buffer.duration)-((1-this.end)*this.source.buffer.duration);
+	this.source.loop=true;
+	this.source.loopStart = this.begin*this.source.buffer.duration
+	this.source.loopEnd = this.end*this.source.buffer.duration
+	this.source.stop(this.ac.currentTime+(dur*loopCount)/this.source.playbackRate.value);
+
+	return input;
 }
 
 //@Refine/differentiate?
