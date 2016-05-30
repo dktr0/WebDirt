@@ -1,47 +1,97 @@
-WebDirt = function(sampleMapUrl,sampleFolder,latency) {
+WebDirt = function(sampleMapUrl,sampleFolder,latency,readyCallback) {
   if(sampleMapUrl == null) sampleMapUrl = "sampleMap.json";
   if(sampleFolder == null) sampleFolder = "samples";
   if(latency == null) latency = 0.2;
   this.latency = latency;
   this.sampleMapUrl = sampleMapUrl;
   this.sampleFolder = sampleFolder;
+  this.sampleBank = new SampleBank(this.sampleMapUrl,this.sampleFolder,readyCallback);
+}
+
+// note: the constructor above does not initialize the Web Audio context.
+// this is deliberate in order to support the way things work on iOS, where
+// the audio context must be initialized in response to a user interaction.
+// each of the methods below the next method (queue, playScore, playScoreWhenReady,
+// loadAndPlayScore,subscribeToTidalSocket) call initializeWebAudio (which has
+// been written to only allow itself to run once) so it is _not_ expected that you call
+// initializeWebAudio yourself. However, for things to work on iOS, you should
+// make sure that that initializeWebAudio is called from a user interaction
+// before any other potential calls to initializeWebAudio.
+
+WebDirt.prototype.initializeWebAudio = function() {
+  if(this.ac != null) return;
   window.AudioContext = window.AudioContext || window.webkitAudioContext;
   try {
     this.ac = new AudioContext();
     this.clockDiff = Date.now()/1000 - this.ac.currentTime;
+    this.sampleBank.ac = this.ac;
     console.log("WebDirt audio context created");
   }
   catch(e) {
     alert('Web Audio API is not supported in this browser');
   }
-  this.sampleBank = new SampleBank(this.sampleMapUrl,this.sampleFolder,this.ac);
 }
 
-WebDirt.prototype.queue = function(msg) {
-	if(msg.when==null) throw Error ("Sample given no 'when' parameter");
-  msg.when = msg.when + this.latency;
+WebDirt.prototype.queue = function(msg,latency) {
+  this.initializeWebAudio();
+  if(latency == null) latency = this.latency;
+	if(msg.when==null) msg.when = this.ac.currentTime; // a sample without a 'when' is played 'now'(+latency)
+  msg.when = msg.when + latency;
   if(msg.when < this.ac.currentTime) {
     console.log("WebDirt warning: msg late by " + (this.ac.currentTime-msg.when) + " seconds" );
   }
   var graph = new Graph(msg,this.ac,this.sampleBank);
 }
 
-WebDirt.prototype.playScore = function(score) {
+WebDirt.prototype.playScore = function(score,latency,finishedCallback) {
   // where score is an array of message objects (each of which fulfills same expectations as the method 'queue' above)
-  var start = this.ac.currentTime + this.latency;
+  // if no second argument (latency) is given, then latency defaults to latency default of this WebDirt instance
+  this.initializeWebAudio();
+  if(latency == null) latency = this.latency;
+  var start = this.ac.currentTime;
+  var latestOnset = 0;
   for(var i in score) {
     var msg = score[i];
+    if(msg.when > latestOnset) latestOnset = msg.when;
     msg.when = msg.when + start;
     // begin: a temporary kludge
-    msg.sample_name = msg.s;
+    if(msg.s != null) msg.sample_name = msg.s;
     if(msg.n != null) msg.sample_n = msg.n;
     // end: a temporary kludge
-    this.sampleBank.load(msg.sample_name,msg.sample_n); // make an early attempt to load samples, ahead of playback
-    this.queue(msg);
+    // this.sampleBank.load(msg.sample_name,msg.sample_n); // make an early attempt to load samples, ahead of playback
+    this.queue(msg,latency);
+  }
+  if(typeof finishedCallback == 'function') {
+    setTimeout(function() {
+      finishedCallback();
+    },(latestOnset+latency)*1000);
   }
 }
 
-WebDirt.prototype.loadAndPlayScore = function(url) {
+WebDirt.prototype.playScoreWhenReady = function(score,latency,readyCallback,finishedCallback) {
+  this.initializeWebAudio();
+  if(latency == null) latency = this.latency;
+  var count = score.length;
+  for(var i in score) {
+    var msg = score[i];
+    var closure = this;
+    // begin: a temporary kludge
+    if(msg.s != null) msg.sample_name = msg.s;
+    if(msg.n != null) msg.sample_n = msg.n;
+    // end: a temporary kludge
+    this.sampleBank.load(msg.sample_name,msg.sample_n,function() {
+      count = count - 1;
+      if(count<=0) {
+        closure.playScore(score,latency,finishedCallback);
+        if(typeof readyCallback == 'function')readyCallback();
+      }
+    });
+  }
+}
+
+WebDirt.prototype.loadAndPlayScore = function(url,latency,readyCallback,finishedCallback) {
+  this.initializeWebAudio();
+  if(latency == null) latency = this.latency;
   var request = new XMLHttpRequest();
   request.open('GET',url,true);
   request.responseType = "json";
@@ -51,12 +101,13 @@ WebDirt.prototype.loadAndPlayScore = function(url) {
     if(request.status != 200) throw Error("status != 200 in callback of loadAndPlayScore");
     if(request.response == null) throw Error("JSON response null in callback of loadAndPlayScore");
     console.log("playing JSON score from " + url);
-    closure.playScore(request.response);
+    closure.playScoreWhenReady(request.response,latency,readyCallback,finishedCallback);
   }
   request.send();
 }
 
 WebDirt.prototype.subscribeToTidalSocket = function(url,withLog) {
+  this.initializeWebAudio();
   if(withLog == null)withLog = false;
   window.WebSocket = window.WebSocket || window.MozWebSocket;
   console.log("WebDirt: attempting websocket connection to " + url);

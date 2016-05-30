@@ -1,10 +1,13 @@
 
-SampleBank = function(sampleMapUrl,urlPrefix,audioContext) {
+// note: the SampleBank constructor does not take an audio context argument
+// however, most SampleBank methods assume/require that a valid audio context is stored in property ac
+// so before doing anything with a newly created SampleBank object you should set it's property ac to
+// a valid audio context.
+
+SampleBank = function(sampleMapUrl,urlPrefix,callbackWhenReady) {
   this.sampleMapUrl = sampleMapUrl;
   this.urlPrefix = urlPrefix;
   this.samples = {};
-  if(audioContext == null) throw Error("audioContext argument to SampleBank constructor was null");
-  this.ac = audioContext;
 
   var request = new XMLHttpRequest();
   request.open('GET',this.sampleMapUrl,true);
@@ -16,19 +19,22 @@ SampleBank = function(sampleMapUrl,urlPrefix,audioContext) {
     if(request.response == null) throw Error("JSON response null in callback of sampleMap load");
     closure.sampleMap = request.response;
     console.log("sampleMap loaded from " + closure.sampleMapUrl);
+    if(typeof callbackWhenReady == 'function')callbackWhenReady();
   };
   request.send();
 }
 
 // loads the set of samples with the same name (but different number)
 SampleBank.prototype.loadAllNamed = function(name) {
+  if(this.ac == null) throw Error("called SampleBank.loadAllNamed with null audio context");
   if(this.sampleMap == null) throw Error("SampleBank.loadAllNamed: sampleMap is null");
   if(this.sampleMap[name] == null) throw Error("SampleBank.loadAllNamed: no sampleMap for " + name);
   for(var n=0;n<this.sampleMap[name].length;n++) this.load(name,n);
 }
 
 // loads an individual sample
-SampleBank.prototype.load = function(name,number) {
+SampleBank.prototype.load = function(name,number,callbackWhenReady) {
+  if(this.ac == null) throw Error("called SampleBank.load with null audio context");
   if(number == null) number = 0;
   if(this.sampleMap == null) throw Error("SampleBank.load: sampleMap is null");
   if(this.sampleMap[name] == null) throw Error("SampleBank.load: no sampleMap for " + name);
@@ -36,11 +42,13 @@ SampleBank.prototype.load = function(name,number) {
   var filename = this.sampleMap[name][number];
   if(this.samples[filename] != null) {
     if(this.samples[filename].status == 'ready') {
-        console.log('warning: already loaded sample ' + name);
+        // console.log('warning: already loaded sample ' + name);
+        if(typeof callbackWhenReady == 'function') callbackWhenReady();
         return;
     }
     if(this.samples[filename].status == 'loading') {
-        console.log('warning: loading already in progress for sample ' + name);
+        // console.log('warning: loading already in progress for sample ' + name);
+        if(typeof callbackWhenReady == 'function') callbackWhenReady(); // not sure about this, but for now...
         return;
     }
   }
@@ -56,6 +64,7 @@ SampleBank.prototype.load = function(name,number) {
         console.log("sample " + url + "loaded");
         closure.samples[filename].buffer = x; // ...the decoded data to be kept in the object
         closure.samples[filename].status = 'ready';
+        if(typeof callbackWhenReady == 'function') callbackWhenReady();
       },
       function(err) {
         console.log("error decoding sample " + url);
@@ -70,6 +79,7 @@ SampleBank.prototype.load = function(name,number) {
 }
 
 SampleBank.prototype.getBuffer = function(name,number) {
+  if(this.ac == null) throw Error("called SampleBank.getBuffer with null audio context");
   if(number == null) number = 0;
   if(this.sampleMap == null) throw Error("SampleBank.getBuffer: sampleMap is null");
   if(this.sampleMap[name] == null) throw Error("SampleBank.getBuffer: no sampleMap for " + name);

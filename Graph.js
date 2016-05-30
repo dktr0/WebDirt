@@ -102,13 +102,11 @@ function Graph(msg,ac,sampleBank){
 	gain2.connect(channelMerger,0,1);
 	channelMerger.connect(ac.destination);
 
-
 }
 
 
 //Accelerate @Still working on negative values
 Graph.prototype.accelerate = function(accelerateValue){
-		// Accelerate (in progress, partially working)
 	if(isNaN(parseInt(accelerateValue))) accelerateValue = 0;
 	if(accelerateValue!=0){
 
@@ -229,9 +227,7 @@ Graph.prototype.coarse = function(input, coarse){
 
 
 Graph.prototype.start = function() {
-	console.log("start")
-	//#@
-	this.source.start(0,this.begin*this.source.buffer.duration,this.end*this.source.buffer.duration);
+	this.source.start(this.when,this.begin*this.source.buffer.duration,this.end*this.source.buffer.duration);
 }
 
 //@gain on first hit of something with a delay

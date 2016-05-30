@@ -13,21 +13,24 @@ function onload() {
 }
 
 WebDirt.prototype.testWebAudioIsWorking = function() {
-  var sine = this.ac.createOscillator();
-	sine.type = 'sine';
-	sine.frequency.value = 440;
-	var gain = this.ac.createGain();
-	sine.connect(gain);
-	gain.connect(this.ac.destination);
-	sine.start();
+  this.initializeWebAudio();
+  this.sine = this.ac.createOscillator();
+	this.sine.type = 'sine';
+	this.sine.frequency.value = 440;
+	this.gain = this.ac.createGain();
+	this.sine.connect(this.gain);
+	this.gain.connect(this.ac.destination);
+	this.sine.start();
 	// envelope
 	var now = this.ac.currentTime;
-	gain.gain.setValueAtTime(0,now);
-  gain.gain.linearRampToValueAtTime(1,now+0.005);
-  gain.gain.linearRampToValueAtTime(0,now+0.405);
+	this.gain.gain.setValueAtTime(0,now);
+  this.gain.gain.linearRampToValueAtTime(1,now+0.005);
+  this.gain.gain.linearRampToValueAtTime(0,now+0.405);
 }
 
 WebDirt.prototype.testSampleBankGetsBuffer = function() {
+  this.initializeWebAudio();
+  this.sampleBank.ac = this.ac;
   var source = this.ac.createBufferSource();
   source.buffer = this.sampleBank.getBuffer('cp',0);
   source.connect(this.ac.destination);
@@ -36,11 +39,9 @@ WebDirt.prototype.testSampleBankGetsBuffer = function() {
 }
 
 WebDirt.prototype.testPlaybackOfSimpleMessage = function(){
-  var msg = { sample_name: 'cp', sample_n:0, when:this.ac.currentTime+0.5 };
+  var msg = { sample_name: 'cp', sample_n:0};
   this.queue(msg);
 }
-
-
 
 WebDirt.prototype.testComplexMessage = function() {
   var msg = {};
