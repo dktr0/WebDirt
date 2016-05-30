@@ -30,7 +30,25 @@ WebDirt.prototype.initializeWebAudio = function() {
   catch(e) {
     alert('Web Audio API is not supported in this browser');
   }
+  this.silentNote = this.ac.createOscillator();
+  this.silentNote.type = 'sine';
+  this.silentNote.frequency.value = 440;
+  this.silentGain = this.ac.createGain();
+  this.silentGain.gain.value = 0;
+  this.silentNote.connect(this.silentGain);
+  this.silentGain.connect(this.ac.destination);
+  this.silentNote.start();
+  var closure = this;
+  setTimeout(function() {
+    console.log("closure");
+    closure.silentGain.disconnect(closure.ac.destination);
+    closure.silentNote.disconnect(closure.silentGain);
+    closure.silentNote.stop();
+    closure.silentGain = null;
+    closure.silentNote = null;
+  },500);
 }
+
 
 WebDirt.prototype.queue = function(msg,latency) {
   this.initializeWebAudio();
