@@ -43,17 +43,12 @@ function Graph(msg,ac,sampleBank){
 			if(x.output == null) x.input.disconnect();
 			else x.input.disconnect(x.output);
 		}
+		try{console.log("hmm");}catch (e){console.log(e)}
+		this.source.buffer.defaultPlayBackRate.value =1
 	}
 
-	// Accelerate
-	if(isNaN(parseInt(msg.accelerate))) msg.accelerate = 0;
-	if(msg.accelerate!=0){
-		last = otherAccelerate(this.source.buffer, msg.accelerate, ac)
-		last.connect(ac.destination)
-		last.start(0)
-		return
-	}
 
+	this.accelerate(msg.accelerate);
 
 	// Distortion
 	last = this.shape(last, msg.shape);
@@ -87,21 +82,19 @@ function Graph(msg,ac,sampleBank){
 	//Gain
 	if(isNaN(parseInt(msg.gain))) msg.gain = 1;
 	var gain = ac.createGain();
-	gain.gain.value = Math.abs(Math.pow(msg.gain/2,4));
+	gain.gain.value = Math.abs(Math.pow(msg.gain,4));
 	last.connect(gain);
 	var last = gain;
-
 
 	//Panning (currently stereo)
 	if(isNaN(parseInt(msg.pan))) msg.pan = 0.5;
 	var gain1 = ac.createGain();
 	var gain2 = ac.createGain();
 
-	//gain1.gain.value= (-1)*Math.pow((1-msg.pan) -1,2)+0.5;
-	//gain2.gain.value=(-1)*Math.pow(msg.pan-1,2)+0.5;;
-	 gain1.gain.value =1-msg.pan;
-	 gain2.gain.value= msg.pan;
-	// @should do equal power panning or something like that instead, i.e. +3 dB as becomes centre-panned
+	//Equal power panning @
+	gain1.gain.value = Math.cos(msg.pan*Math.PI/2);
+	gain2.gain.value = Math.sin(msg.pan*Math.PI/2);
+
 	last.connect(gain1);
 	last.connect(gain2);
 	var channelMerger = ac.createChannelMerger(2);
@@ -113,43 +106,24 @@ function Graph(msg,ac,sampleBank){
 }
 
 
-//Accelerate
-function accelerate (accelerate, ac){
-	var scriptNode = this.ac.createScriptProcessor();
+//Accelerate @Still working on negative values
+Graph.prototype.accelerate = function(accelerateValue){
+		// Accelerate (in progress, partially working)
+	if(isNaN(parseInt(accelerateValue))) accelerateValue = 0;
+	if(accelerateValue!=0){
 
-	scriptNode.onaudioprocess = function(audioProcessingEvent){
-		var inputBuffer = audioProcessingEvent.inputBuffer;
-		var ouputBuffer = audioProcessingEvent.outputBuffer;
-		for (var channel = 0; channel <inputBuffer.numberOfChannels; channel++){
-			var inputData = inputBuffer.getChannelData(channel);
-			var outputData = outputBuffer.getChannelData(channel);
-			for(var frame = 0; accelerate*frame <inputBuffer.length; frame++){
-				outputData[frame] = inputData[frame*accelerate];
+		try{
+			if(this.source.buffer.length*(accelerateValue)/this.ac.sampleRate,this.ac.currentTime<0){
+				this.source.playbackRate.setTargetAtTime(0.00001,this.ac.currentTime,this.source.buffer.duration*2);
 			}
+			else
+			this.source.playbackRate.setTargetAtTime(this.source.buffer.length*(accelerateValue)/this.ac.sampleRate,this.ac.currentTime,this.source.buffer.duration*2);
+
+		}catch(e){
+			console.log(e)
 		}
 	}
 
-	return scriptNode
-}
-
-
-//Accelerate
-function otherAccelerate(buffer, accelerate, ac){
-	var frames = buffer.length;
-	var pcmData = new Float32Array(frames);
-	var newBuffer = ac.createBuffer(buffer.numberOfChannels,buffer.length,ac.sampleRate);
-	var source = ac.createBufferSource();
-	var newChannelData = new Float32Array(frames);
-	buffer.copyFromChannel(pcmData,0,0);
-
-	for(var frame = 0; frame <buffer.length; frame++){
-		newChannelData[frame] = pcmData[Math.round((frame*accelerate*frame))/19];
-	}
-
-	newBuffer.copyToChannel(newChannelData,0,0);
-	source.buffer = newBuffer;
-
-	return source;
 }
 
 
