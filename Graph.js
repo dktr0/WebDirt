@@ -37,7 +37,8 @@ function Graph(msg,ac,sampleBank){
 	var parent = this;
 	this.source.onended = function(){
 		if(parent.disconnectQueue == null) return;
-		for(let x of parent.disconnectQueue) {
+		for(var i in parent.disconnectQueue) {
+			var x = parent.disconnectQueue[i];
 			if(x.input == null) throw Error("first of pair of things to disconnect must exist");
 			if(x.output == null) x.input.disconnect();
 			else x.input.disconnect(x.output);
