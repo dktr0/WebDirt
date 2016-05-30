@@ -17,18 +17,21 @@ WebDirt = function(sampleMapUrl,sampleFolder,latency) {
   this.sampleBank = new SampleBank(this.sampleMapUrl,this.sampleFolder,this.ac);
 }
 
-WebDirt.prototype.queue = function(msg) {
+WebDirt.prototype.queue = function(msg,latency) {
+  if(latency == null) latency = this.latency;
 	if(msg.when==null) throw Error ("Sample given no 'when' parameter");
-  msg.when = msg.when + this.latency;
+  msg.when = msg.when + latency;
   if(msg.when < this.ac.currentTime) {
     console.log("WebDirt warning: msg late by " + (this.ac.currentTime-msg.when) + " seconds" );
   }
   var graph = new Graph(msg,this.ac,this.sampleBank);
 }
 
-WebDirt.prototype.playScore = function(score) {
+WebDirt.prototype.playScore = function(score,latency) {
   // where score is an array of message objects (each of which fulfills same expectations as the method 'queue' above)
-  var start = this.ac.currentTime + this.latency;
+  // if no second argument (latency) is given, then latency defaults to latency default of this WebDirt instance
+  if(latency == null) latency = this.latency;
+  var start = this.ac.currentTime;
   for(var i in score) {
     var msg = score[i];
     msg.when = msg.when + start;
@@ -37,11 +40,29 @@ WebDirt.prototype.playScore = function(score) {
     if(msg.n != null) msg.sample_n = msg.n;
     // end: a temporary kludge
     this.sampleBank.load(msg.sample_name,msg.sample_n); // make an early attempt to load samples, ahead of playback
-    this.queue(msg);
+    this.queue(msg,latency);
   }
 }
 
-WebDirt.prototype.loadAndPlayScore = function(url) {
+WebDirt.prototype.playScoreWhenReady = function(score,latency) {
+  if(latency == null) latency = this.latency;
+  var count = score.length;
+  for(var i in score) {
+    var msg = score[i];
+    var closure = this;
+    // begin: a temporary kludge
+    msg.sample_name = msg.s;
+    if(msg.n != null) msg.sample_n = msg.n;
+    // end: a temporary kludge
+    this.sampleBank.load(msg.sample_name,msg.sample_n,function() {
+      count = count - 1;
+      if(count<=0) closure.playScore(score,latency);
+    });
+  }
+}
+
+WebDirt.prototype.loadAndPlayScore = function(url,latency) {
+  if(latency == null) latency = this.latency;
   var request = new XMLHttpRequest();
   request.open('GET',url,true);
   request.responseType = "json";
@@ -51,7 +72,7 @@ WebDirt.prototype.loadAndPlayScore = function(url) {
     if(request.status != 200) throw Error("status != 200 in callback of loadAndPlayScore");
     if(request.response == null) throw Error("JSON response null in callback of loadAndPlayScore");
     console.log("playing JSON score from " + url);
-    closure.playScore(request.response);
+    closure.playScoreWhenReady(request.response,latency);
   }
   request.send();
 }

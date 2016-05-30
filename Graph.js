@@ -269,7 +269,7 @@ Graph.prototype.coarse = function(input, coarse){
 
 
 Graph.prototype.start = function() {
-	console.log("start")
+	// console.log("start")
 	this.source.start(this.when,this.begin*this.source.buffer.duration,this.end*this.source.buffer.duration);
 }
 

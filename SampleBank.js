@@ -28,7 +28,7 @@ SampleBank.prototype.loadAllNamed = function(name) {
 }
 
 // loads an individual sample
-SampleBank.prototype.load = function(name,number) {
+SampleBank.prototype.load = function(name,number,callbackWhenReady) {
   if(number == null) number = 0;
   if(this.sampleMap == null) throw Error("SampleBank.load: sampleMap is null");
   if(this.sampleMap[name] == null) throw Error("SampleBank.load: no sampleMap for " + name);
@@ -36,11 +36,13 @@ SampleBank.prototype.load = function(name,number) {
   var filename = this.sampleMap[name][number];
   if(this.samples[filename] != null) {
     if(this.samples[filename].status == 'ready') {
-        console.log('warning: already loaded sample ' + name);
+        // console.log('warning: already loaded sample ' + name);
+        if(typeof callbackWhenReady == 'function') callbackWhenReady();
         return;
     }
     if(this.samples[filename].status == 'loading') {
-        console.log('warning: loading already in progress for sample ' + name);
+        // console.log('warning: loading already in progress for sample ' + name);
+        if(typeof callbackWhenReady == 'function') callbackWhenReady(); // not sure about this, but for now...
         return;
     }
   }
@@ -56,6 +58,7 @@ SampleBank.prototype.load = function(name,number) {
         console.log("sample " + url + "loaded");
         closure.samples[filename].buffer = x; // ...the decoded data to be kept in the object
         closure.samples[filename].status = 'ready';
+        if(typeof callbackWhenReady == 'function') callbackWhenReady();
       },
       function(err) {
         console.log("error decoding sample " + url);
