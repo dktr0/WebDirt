@@ -1,11 +1,11 @@
-WebDirt = function(sampleMapUrl,sampleFolder,latency,callbackWhenReady) {
+WebDirt = function(sampleMapUrl,sampleFolder,latency,readyCallback) {
   if(sampleMapUrl == null) sampleMapUrl = "sampleMap.json";
   if(sampleFolder == null) sampleFolder = "samples";
   if(latency == null) latency = 0.2;
   this.latency = latency;
   this.sampleMapUrl = sampleMapUrl;
   this.sampleFolder = sampleFolder;
-  this.sampleBank = new SampleBank(this.sampleMapUrl,this.sampleFolder,callbackWhenReady);
+  this.sampleBank = new SampleBank(this.sampleMapUrl,this.sampleFolder,readyCallback);
 }
 
 // note: the constructor above does not initialize the Web Audio context.
@@ -43,25 +43,32 @@ WebDirt.prototype.queue = function(msg,latency) {
   var graph = new Graph(msg,this.ac,this.sampleBank);
 }
 
-WebDirt.prototype.playScore = function(score,latency) {
+WebDirt.prototype.playScore = function(score,latency,finishedCallback) {
   // where score is an array of message objects (each of which fulfills same expectations as the method 'queue' above)
   // if no second argument (latency) is given, then latency defaults to latency default of this WebDirt instance
   this.initializeWebAudio();
   if(latency == null) latency = this.latency;
   var start = this.ac.currentTime;
+  var latestOnset = 0;
   for(var i in score) {
     var msg = score[i];
+    if(msg.when > latestOnset) latestOnset = msg.when;
     msg.when = msg.when + start;
     // begin: a temporary kludge
     if(msg.s != null) msg.sample_name = msg.s;
     if(msg.n != null) msg.sample_n = msg.n;
     // end: a temporary kludge
-    this.sampleBank.load(msg.sample_name,msg.sample_n); // make an early attempt to load samples, ahead of playback
+    // this.sampleBank.load(msg.sample_name,msg.sample_n); // make an early attempt to load samples, ahead of playback
     this.queue(msg,latency);
+  }
+  if(typeof finishedCallback == 'function') {
+    setTimeout(function() {
+      finishedCallback();
+    },(latestOnset+latency)*1000);
   }
 }
 
-WebDirt.prototype.playScoreWhenReady = function(score,latency) {
+WebDirt.prototype.playScoreWhenReady = function(score,latency,readyCallback,finishedCallback) {
   this.initializeWebAudio();
   if(latency == null) latency = this.latency;
   var count = score.length;
@@ -74,12 +81,15 @@ WebDirt.prototype.playScoreWhenReady = function(score,latency) {
     // end: a temporary kludge
     this.sampleBank.load(msg.sample_name,msg.sample_n,function() {
       count = count - 1;
-      if(count<=0) closure.playScore(score,latency);
+      if(count<=0) {
+        closure.playScore(score,latency,finishedCallback);
+        if(typeof readyCallback == 'function')readyCallback();
+      }
     });
   }
 }
 
-WebDirt.prototype.loadAndPlayScore = function(url,latency) {
+WebDirt.prototype.loadAndPlayScore = function(url,latency,readyCallback,finishedCallback) {
   this.initializeWebAudio();
   if(latency == null) latency = this.latency;
   var request = new XMLHttpRequest();
@@ -91,7 +101,7 @@ WebDirt.prototype.loadAndPlayScore = function(url,latency) {
     if(request.status != 200) throw Error("status != 200 in callback of loadAndPlayScore");
     if(request.response == null) throw Error("JSON response null in callback of loadAndPlayScore");
     console.log("playing JSON score from " + url);
-    closure.playScoreWhenReady(request.response,latency);
+    closure.playScoreWhenReady(request.response,latency,readyCallback,finishedCallback);
   }
   request.send();
 }
