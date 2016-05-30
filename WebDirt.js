@@ -40,7 +40,20 @@ WebDirt.prototype.queue = function(msg,latency) {
   if(msg.when < this.ac.currentTime) {
     console.log("WebDirt warning: msg late by " + (this.ac.currentTime-msg.when) + " seconds" );
   }
-  var graph = new Graph(msg,this.ac,this.sampleBank);
+
+  this.compressor = this.ac.createDynamicsCompressor();
+  this.compressor.threshold.value= 20; //value taken in decibels
+  this.compressor.knee.value = 10; //Low/hard knee
+  this.compressor.ratio.value = 20; //relatively hard compression
+  this.compressor.reduction.value = 0; //No gain reduction
+  this.compressor.attack.value = 0; //Quickly kill/clip wild values
+  this.compressor.release.value = 0; //More slowly go back.
+
+  this.compressor.connect(this.ac.destination)
+try{
+  var graph = new Graph(msg,this.ac,this.sampleBank,this.compressor);
+}catch(e){console.log(e)}
+
 }
 
 WebDirt.prototype.playScore = function(score,latency,finishedCallback) {
