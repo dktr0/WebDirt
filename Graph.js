@@ -210,18 +210,12 @@ Graph.prototype.crush = function(input, crush){
 		}//end scriptNode audio processing handler
 
 		input.connect(scriptNode);
-		//Defines a function to disconnect the script processor node
-		//if a crush effect is added (called in onended funciton of this.source)
-
 		this.disconnectOnEnd(input,scriptNode);
 		this.disconnectOnEnd(scriptNode);
-		console.log("crush handler")
 	return scriptNode;
 	}
-	else{
+	else
 		return input
-
-	}
 }//End Crush
 
 //Coarse Effect
@@ -250,10 +244,8 @@ Graph.prototype.coarse = function(input, coarse){
 		}//end scriptNode audio processing handler
 
 		input.connect(scriptNode);
-
 		this.disconnectOnEnd(input,scriptNode);
 		this.disconnectOnEnd(scriptNode);
-
 		return scriptNode;
 	}
 	else
