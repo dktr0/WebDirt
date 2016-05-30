@@ -9,7 +9,9 @@
 var webDirt;
 
 function onload() {
-  webDirt = new WebDirt();
+  webDirt = new WebDirt(null,null,null,function() {
+    console.log("callback from WebDirt constructor completed");
+  });
 }
 
 WebDirt.prototype.testWebAudioIsWorking = function() {
@@ -31,11 +33,11 @@ WebDirt.prototype.testWebAudioIsWorking = function() {
 WebDirt.prototype.testSampleBankGetsBuffer = function() {
   this.initializeWebAudio();
   this.sampleBank.ac = this.ac;
-  var source = this.ac.createBufferSource();
-  source.buffer = this.sampleBank.getBuffer('cp',0);
-  source.connect(this.ac.destination);
+  this.source = this.ac.createBufferSource();
+  this.source.buffer = this.sampleBank.getBuffer('cp',0);
+  this.source.connect(this.ac.destination);
   var soon = this.ac.currentTime+0.2;
-  source.start(soon);
+  this.source.start(soon);
 }
 
 WebDirt.prototype.testPlaybackOfSimpleMessage = function(){

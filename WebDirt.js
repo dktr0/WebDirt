@@ -37,9 +37,8 @@ WebDirt.prototype.queue = function(msg,latency) {
   if(latency == null) latency = this.latency;
 	if(msg.when==null) msg.when = this.ac.currentTime; // a sample without a 'when' is played 'now'(+latency)
   msg.when = msg.when + latency;
-  if(msg.when < this.ac.currentTime) {
-    console.log("WebDirt warning: msg late by " + (this.ac.currentTime-msg.when) + " seconds" );
-  }
+
+  if(msg.when < this.ac.currentTime) console.log("WebDirt warning: msg late by " + (this.ac.currentTime-msg.when) + " seconds" );
 
   this.compressor = this.ac.createDynamicsCompressor();
   this.compressor.threshold.value= 20; //value taken in decibels
@@ -50,10 +49,8 @@ WebDirt.prototype.queue = function(msg,latency) {
   this.compressor.release.value = 0; //More slowly go back.
 
   this.compressor.connect(this.ac.destination)
-try{
-  var graph = new Graph(msg,this.ac,this.sampleBank,this.compressor);
-}catch(e){console.log(e)}
 
+  var graph = new Graph(msg,this.ac,this.sampleBank,this.compressor);
 }
 
 WebDirt.prototype.playScore = function(score,latency,finishedCallback) {
