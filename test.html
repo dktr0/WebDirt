@@ -69,7 +69,7 @@ WebDirt.prototype.testComplexMessage = function() {
   msg.loop = document.getElementById('loop').value;
   msg.begin = document.getElementById('begin').value;
   msg.end = document.getElementById('end').value;
-  msg.when = 0;  //msg.when = this.ac.currentTime+0.5;
+  msg.when = this.ac.currentTime+0.5;
 
   this.queue(msg);
 }

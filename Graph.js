@@ -15,12 +15,10 @@ function Graph(msg,ac,sampleBank,compressor){
 	var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
 	if(isNaN(parseInt(msg.speed))) msg.speed = 1;
 	if(msg.speed>=0 && buffer != null) this.source.buffer = buffer;
-	if(msg.speed<0 && buffer != null) {
-		try{
-		this.source.buffer=this.reverseBuffer(buffer)
-	}catch(e){console.log(e)}
-	}
-	this.source.playbackRate.value=Math.abs(msg.speed);
+	if(msg.speed<0 && buffer != null)  this.source.buffer=this.reverseBuffer(buffer)
+	msg.speed = Math.abs(msg.speed)
+	this.source.playbackRate.value = msg.speed;
+
 	if(buffer != null) this.start();
 	else { // buffer not available but may be available soon
 		var closure = this;
@@ -35,8 +33,12 @@ function Graph(msg,ac,sampleBank,compressor){
 		},reattemptDelay);
 	}
 
+	//@Bug - if sample hasn't been loaded before this run and a scriptNode effect is used,
+	//this onend function won't fire and the scriptnode handlers will continuously be invoked
 	var parent = this;
 	this.source.onended = function(){
+		console.log("onend called")
+		try{console.log("end playback: " + parent.source.playbackRate.value)}catch(e){console.log(e)}
 		if(parent.disconnectQueue == null) return;
 		for(var i in parent.disconnectQueue) {
 			var x = parent.disconnectQueue[i];
@@ -44,11 +46,12 @@ function Graph(msg,ac,sampleBank,compressor){
 			if(x.output == null) x.input.disconnect();
 			else x.input.disconnect(x.output);
 		}
-		//this.source.buffer.defaultPlayBackRate.value =1
+
+
 	}
 
 	//Accelerate
-	this.accelerate(msg.accelerate);
+	this.accelerate(msg.accelerate, msg.speed);
 	// Distortion
 	last = this.shape(last, msg.shape);
 	//Lowpass filtering @what level/function to set frequency and resonant gain at?
@@ -67,6 +70,8 @@ function Graph(msg,ac,sampleBank,compressor){
 	last = this.coarse(last, msg.coarse);
 	//Crush
 	last = this.crush(last, msg.crush);
+	//Unit
+
 	//Gain
 	if(isNaN(parseInt(msg.gain))) msg.gain = 1;
 	var gain = ac.createGain();
@@ -88,7 +93,8 @@ function Graph(msg,ac,sampleBank,compressor){
 	var channelMerger = ac.createChannelMerger(2);
 	gain1.connect(channelMerger,0,0);
 	gain2.connect(channelMerger,0,1);
-	channelMerger.connect(compressor);
+	channelMerger.connect(this.ac.destination);
+
 
 
 	compressor.connect(this.ac.destination);
@@ -100,7 +106,6 @@ Graph.prototype.start = function() {
 }
 
 Graph.prototype.disconnectOnEnd = function(x,y) {
-	console.log("disconnectOnEnd");
 	var obj = {input:x,output:y};
 	if(this.disconnectQueue == null) this.disconnectQueue = new Array;
 	this.disconnectQueue.push(obj);
@@ -113,17 +118,16 @@ Graph.prototype.disconnectOnEnd = function(x,y) {
 
 
 //Accelerate @Still working on negative values
-Graph.prototype.accelerate = function(accelerateValue){
+Graph.prototype.accelerate = function(accelerateValue, speed){
 	if(isNaN(parseInt(accelerateValue))) accelerateValue = 0;
 	if(accelerateValue!=0){
-
+		this.source.playbackRate.setValueAtTime(speed, this.when);
 		//If the final playbackrate will be negative... for now just
 		//choose a value close to zero@
-		if((this.source.buffer.length*(accelerateValue)/this.ac.sampleRate,this.ac.currentTime)<0)
-			this.source.playbackRate.setTargetAtTime(0.00001,this.ac.currentTime,this.source.buffer.duration*2);
+		if((speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate)<0)
+			this.source.playbackRate.linearRampToValueAtTime(0.1,this.when+this.source.buffer.duration);
 		else
-			this.source.playbackRate.setTargetAtTime(this.source.buffer.length*(accelerateValue)/this.ac.sampleRate,this.ac.currentTime,this.source.buffer.duration*2);
-
+			this.source.playbackRate.linearRampToValueAtTime(speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate,this.when+this.source.buffer.duration);
 	}
 	
 
@@ -144,22 +148,17 @@ Graph.prototype.bandPassFilter=function(input, bandf, bandq){
 }
 
 
-
-
 //Coarse Effect
 Graph.prototype.coarse = function(input, coarse){
 	//Safety and msg parsing
 	if(isNaN(parseInt(coarse))) coarse = 1;
 	coarse=Math.abs(coarse);
-	//If coarse is valid, coarseNode becomes last with coarseNode effect
-	//otherwise, coarseNode becomes last
 	if(coarse>1){
 		var	scriptNode = this.ac.createScriptProcessor();
+
 		scriptNode.onaudioprocess = function(audioProcessingEvent){
 			var inputBuffer = audioProcessingEvent.inputBuffer;
-
 			var outputBuffer = audioProcessingEvent.outputBuffer;
-
 			for (var channel=0;channel<outputBuffer.numberOfChannels; channel++){
 				var inputData = inputBuffer.getChannelData(channel);
 				var outputData = outputBuffer.getChannelData(channel);
@@ -168,7 +167,7 @@ Graph.prototype.coarse = function(input, coarse){
 					else outputData[frame]=outputData[frame-1];
 				}//Frames
 			}//Channels
-		//console.log("coarse handler")
+			console.log("coarse")
 		}//end scriptNode audio processing handler
 
 		input.connect(scriptNode);
@@ -198,7 +197,6 @@ Graph.prototype.crush = function(input, crush){
 					outputData[frame]=Math.round(inputData[frame]*Math.pow(2,(crush-1)))/Math.pow(2,(crush-1));
 				}//Frames
 			}//Channels
-				//console.log("crush handler")
 		}//end scriptNode audio processing handler
 
 		input.connect(scriptNode);
@@ -214,7 +212,6 @@ Graph.prototype.crush = function(input, crush){
 
 //@gain on first hit of something with a delay
 Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
-	console.log(outputGain)
 	if(isNaN(parseInt(outputGain))) outputGain = 0;
 	outputGain = Math.abs(outputGain);
 	if(outputGain!=0){
@@ -316,11 +313,18 @@ function makeDistortionCurve(amount){
 return curve;
 }
 
+// Graph.prototype.negativeAccelerateBuffer = function(buffer, accelerateValue){
+// 	var frames = buffer.length;
+// 	var pcmData = new Float32Array(frames);
+// 	var newBuffer = this.ac.createBuffer(buffer.numberOfChannels, buffer.length, this.ac.sampleRate)
+
+
+// }
 
 
 //Returns a new BufferSourceNode containing a buffer with the reversed frames of the
 //parameter 'buffer'
-//@add add more for multi-channel samples
+//@channels
 Graph.prototype.reverseBuffer= function(buffer){
 	var frames = buffer.length;
 	var pcmData = new Float32Array(frames);
@@ -328,19 +332,17 @@ Graph.prototype.reverseBuffer= function(buffer){
 	// var source = ac.createBufferSource();
 	var newChannelData = new Float32Array(frames);
 
-	buffer.copyFromChannel(pcmData,0,0);
-	for (var i =0;i<frames;i++){
-		newChannelData[i]=pcmData[frames-i];
+	for(var channel=0; channel<buffer.numberOfChannels; channel++){
+		buffer.copyFromChannel(pcmData,channel,0);
+		for (var i =0;i<frames;i++){
+			newChannelData[i]=pcmData[frames-i];
+		}
+		//First element of newChannelData will be set to NaN - causes clipping on first frame
+		//set to second element to get rid of clipping
+		newChannelData[0]=newChannelData[1];
+		newBuffer.copyToChannel(newChannelData,channel,0);
 	}
-	//First element of newChannelData will be set to NaN - causes clipping on first frame
-	//set to send element to get rid of clipping
-	newChannelData[0]=newChannelData[1];
-	newBuffer.copyToChannel(newChannelData,0,0);
-
 	return newBuffer;
-
-//	source.buffer = newBuffer;
-//	return source;
 }
 
 Graph.prototype.shape = function (input, shape){
@@ -363,6 +365,16 @@ Graph.prototype.shape = function (input, shape){
 	else
 		return input;
 }
+
+// //Unit
+// Graph.prototype.unit = function(cps){
+// 	    a->accelerate = a->accelerate * a->speed * a->cps; // change rate by 1 per cycle
+//     a->speed = sample->info->frames * a->speed * a->cps / samplerate;
+//     if (isNaN(parseInt(cps)) || cps==null) cps = 1
+
+//     this.accelerate = this.accelerate*this.speed*cps;
+// 	this.speed = this.speed*
+// }
 
 //Vowel effect
 //@ get frequencies from superdirt

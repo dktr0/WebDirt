@@ -25,6 +25,15 @@ WebDirt.prototype.initializeWebAudio = function() {
     this.ac = new AudioContext();
     this.clockDiff = Date.now()/1000 - this.ac.currentTime;
     this.sampleBank.ac = this.ac;
+    
+    this.compressor = this.ac.createDynamicsCompressor();
+    this.compressor.threshold.value= 20; //value taken in decibels
+    this.compressor.knee.value = 10; //Low/hard knee
+    this.compressor.ratio.value = 4; 
+    this.compressor.reduction.value = 0; //No gain reduction
+    this.compressor.attack.value = 0.05;
+    this.compressor.release.value = 0.1; //More slowly go back.
+
     console.log("WebDirt audio context created");
   }
   catch(e) {
@@ -57,14 +66,6 @@ WebDirt.prototype.queue = function(msg,latency) {
   msg.when = msg.when + latency;
 
   if(msg.when < this.ac.currentTime) console.log("WebDirt warning: msg late by " + (this.ac.currentTime-msg.when) + " seconds" );
-
-  this.compressor = this.ac.createDynamicsCompressor();
-  this.compressor.threshold.value= 20; //value taken in decibels
-  this.compressor.knee.value = 10; //Low/hard knee
-  this.compressor.ratio.value = 20; //relatively hard compression
-  this.compressor.reduction.value = 0; //No gain reduction
-  this.compressor.attack.value = 0; //Quickly kill/clip wild values
-  this.compressor.release.value = 0; //More slowly go back.
 
   this.compressor.connect(this.ac.destination)
 
