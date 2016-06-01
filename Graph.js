@@ -35,20 +35,6 @@ function Graph(msg,ac,sampleBank,compressor){
 
 	//@Bug - if sample hasn't been loaded before this run and a scriptNode effect is used,
 	//this onend function won't fire and the scriptnode handlers will continuously be invoked
-	var parent = this;
-	this.source.onended = function(){
-		console.log("onend called")
-		try{console.log("end playback: " + parent.source.playbackRate.value)}catch(e){console.log(e)}
-		if(parent.disconnectQueue == null) return;
-		for(var i in parent.disconnectQueue) {
-			var x = parent.disconnectQueue[i];
-			if(x.input == null) throw Error("first of pair of things to disconnect must exist");
-			if(x.output == null) x.input.disconnect();
-			else x.input.disconnect(x.output);
-		}
-
-
-	}
 
 	//Accelerate
 	this.accelerate(msg.accelerate, msg.speed);
@@ -102,6 +88,7 @@ function Graph(msg,ac,sampleBank,compressor){
 
 
 Graph.prototype.start = function() {
+	this.source.onended = this.disconnectHandler();
 	this.source.start(this.when,this.begin*this.source.buffer.duration,this.end*this.source.buffer.duration);
 }
 
@@ -111,6 +98,20 @@ Graph.prototype.disconnectOnEnd = function(x,y) {
 	this.disconnectQueue.push(obj);
 }
 
+Graph.prototype.disconnectHandler = function() {
+	var closure = this;
+	return function() {
+		console.log("onend called")
+		try{console.log("end playback: " + closure.source.playbackRate.value)}catch(e){console.log(e)}
+		if(closure.disconnectQueue == null) return;
+		for(var i in closure.disconnectQueue) {
+			var x = closure.disconnectQueue[i];
+			if(x.input == null) throw Error("first of pair of things to disconnect must exist");
+			if(x.output == null) x.input.disconnect();
+			else x.input.disconnect(x.output);
+		}
+	}
+}
 
 ////////////////////////////////////////////
 //             EFFECT FUNCTIONS:          //
@@ -129,7 +130,7 @@ Graph.prototype.accelerate = function(accelerateValue, speed){
 		else
 			this.source.playbackRate.linearRampToValueAtTime(speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate,this.when+this.source.buffer.duration);
 	}
-	
+
 
 }
 

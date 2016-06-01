@@ -1,7 +1,7 @@
 WebDirt = function(sampleMapUrl,sampleFolder,latency,readyCallback) {
   if(sampleMapUrl == null) sampleMapUrl = "sampleMap.json";
   if(sampleFolder == null) sampleFolder = "samples";
-  if(latency == null) latency = 0.2;
+  if(latency == null) latency = 0.4;
   this.latency = latency;
   this.sampleMapUrl = sampleMapUrl;
   this.sampleFolder = sampleFolder;
@@ -25,11 +25,11 @@ WebDirt.prototype.initializeWebAudio = function() {
     this.ac = new AudioContext();
     this.clockDiff = Date.now()/1000 - this.ac.currentTime;
     this.sampleBank.ac = this.ac;
-    
+
     this.compressor = this.ac.createDynamicsCompressor();
     this.compressor.threshold.value= 20; //value taken in decibels
     this.compressor.knee.value = 10; //Low/hard knee
-    this.compressor.ratio.value = 4; 
+    this.compressor.ratio.value = 4;
     this.compressor.reduction.value = 0; //No gain reduction
     this.compressor.attack.value = 0.05;
     this.compressor.release.value = 0.1; //More slowly go back.
