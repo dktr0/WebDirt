@@ -50,6 +50,8 @@ function Graph(msg,ac,sampleBank,compressor){
 
 	}
 
+	this.negativeAccelerateBuffer(this.source.buffer, msg.accelerate, this.speed);
+
 	//Accelerate
 	this.accelerate(msg.accelerate, msg.speed);
 	// Distortion
@@ -95,9 +97,6 @@ function Graph(msg,ac,sampleBank,compressor){
 	gain2.connect(channelMerger,0,1);
 	channelMerger.connect(this.ac.destination);
 
-
-
-	compressor.connect(this.ac.destination);
 }// End Graph
 
 
@@ -117,21 +116,7 @@ Graph.prototype.disconnectOnEnd = function(x,y) {
 ////////////////////////////////////////////
 
 
-//Accelerate @Still working on negative values
-Graph.prototype.accelerate = function(accelerateValue, speed){
-	if(isNaN(parseInt(accelerateValue))) accelerateValue = 0;
-	if(accelerateValue!=0){
-		this.source.playbackRate.setValueAtTime(speed, this.when);
-		//If the final playbackrate will be negative... for now just
-		//choose a value close to zero@
-		if((speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate)<0)
-			this.source.playbackRate.linearRampToValueAtTime(0.1,this.when+this.source.buffer.duration);
-		else
-			this.source.playbackRate.linearRampToValueAtTime(speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate,this.when+this.source.buffer.duration);
-	}
-	
 
-}
 
 Graph.prototype.bandPassFilter=function(input, bandf, bandq){
 	//Bandpass Filter
@@ -313,13 +298,41 @@ function makeDistortionCurve(amount){
 return curve;
 }
 
-// Graph.prototype.negativeAccelerateBuffer = function(buffer, accelerateValue){
-// 	var frames = buffer.length;
-// 	var pcmData = new Float32Array(frames);
-// 	var newBuffer = this.ac.createBuffer(buffer.numberOfChannels, buffer.length, this.ac.sampleRate)
+
+//Accelerate @Still working on negative values
+Graph.prototype.accelerate = function(accelerateValue, speed){
+	if(isNaN(parseInt(accelerateValue))) accelerateValue = 0;
+	if(accelerateValue!=0){
+		this.source.playbackRate.setValueAtTime(speed, this.when);
+		//If the final playbackrate will be negative... for now just
+		//choose a value close to zero@
+		if((speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate)<0)
+			this.source.playbackRate.linearRampToValueAtTime(0.1,this.when+this.source.buffer.duration);
+		else
+			this.source.playbackRate.linearRampToValueAtTime(speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate,this.when+this.source.buffer.duration);
+	}
+}
+
+Graph.prototype.negativeAccelerateBuffer = function(buffer, accelerateValue, speed){
+	var frames = buffer.length;
+	var pcmData = new Float32Array(frames);
+	var newBuffer = this.ac.createBuffer(buffer.numberOfChannels, buffer.length, this.ac.sampleRate)
+
+	var zeroFrame = (speed/(this.source.buffer.length*accelerateValue/this.ac.sampleRate))*frames;
+	console.log(zeroFrame)
+
+	// rate = speed+(frames)*(this.source.buffer.length*(accelerateValue)/this.ac.sampleRate)
+	// -speed/
+
+	// (((speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate)) = rate*frames+speed
+	// 	0=rate*frames+speed
+	// 	-speed/rate=frames
 
 
-// }
+	// 	-speed)/frames
+
+
+}
 
 
 //Returns a new BufferSourceNode containing a buffer with the reversed frames of the
