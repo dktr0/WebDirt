@@ -74,6 +74,17 @@ WebDirt.prototype.testComplexMessage = function() {
   this.queue(msg);
 }
 
+function testRenderAndPlayScore() {
+  var serverUrl = document.getElementById('renderServer').value;
+  var pattern = document.getElementById('renderPattern').value;
+  var cps = document.getElementById('renderCps').value;
+  var cycles = document.getElementById('renderCycles').value;
+  webDirt.renderAndPlayScore(serverUrl,pattern,cps,cycles,0.05,
+    function() { console.log("received readyCallback") },
+    function() { console.log("received finishedCallback") }
+  );
+}
+
 </script>
 </head>
 <body onload="onload()">
@@ -108,6 +119,13 @@ WebDirt.prototype.testComplexMessage = function() {
 
     <button onclick="webDirt.testComplexMessage()">testComplexMessage</button>
   </div>
+  <div>
+    <textarea id="renderServer"></textarea>
+    <textarea id="renderPattern"></textarea>
+    <textarea id="renderCps"></textarea>
+    <textarea id="renderCycles"></textarea>
+    <button onclick="testRenderAndPlayScore()">testRenderAndPlayScore</button>
+  <div>
   <button onclick="webDirt.subscribeToTidalSocket('127.0.0.1:7771',true)">subscribeToTidalSocket</button>
 </body>
 </html>
