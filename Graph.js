@@ -1,9 +1,7 @@
-var OUTPUT_CHANNELS=2;
-
-function Graph(msg,ac,sampleBank,compressor){
+function Graph(msg,ac,sampleBank,compressor, cutGroups){
+	this.cutGroups=cutGroups
 	this.ac = ac;
 	var last,temp;
-
 	this.when = msg.when;
 
 	// get basic buffer player, including speed change and sample reversal
@@ -35,6 +33,8 @@ function Graph(msg,ac,sampleBank,compressor){
 
 	//Accelerate
 	this.accelerate(msg.accelerate, msg.speed);
+	//Cut
+	this.cut(msg.cut, msg.sample_name);
 	// Distortion
 	last = this.shape(last, msg.shape);
 	//Lowpass filtering @what level/function to set frequency and resonant gain at?
@@ -53,14 +53,13 @@ function Graph(msg,ac,sampleBank,compressor){
 	last = this.coarse(last, msg.coarse);
 	//Crush
 	last = this.crush(last, msg.crush);
-	//Unit
 
 	//Gain
 	if(isNaN(parseInt(msg.gain))) msg.gain = 1;
-	var gain = ac.createGain();
-	gain.gain.value = Math.abs(Math.pow(msg.gain,4));
-	last.connect(gain);
-	var last = gain;
+	this.gain = ac.createGain();
+	this.gain.gain.value = Math.abs(Math.pow(msg.gain,4));
+	last.connect(this.gain);
+	var last = this.gain;
 
 	//Panning (currently stereo)
 	if(isNaN(parseInt(msg.pan))) msg.pan = 0.5;
@@ -76,7 +75,7 @@ function Graph(msg,ac,sampleBank,compressor){
 	var channelMerger = ac.createChannelMerger(2);
 	gain1.connect(channelMerger,0,0);
 	gain2.connect(channelMerger,0,1);
-	channelMerger.connect(this.ac.destination);
+	channelMerger.connect(compressor);
 
 }// End Graph
 
@@ -146,7 +145,6 @@ Graph.prototype.coarse = function(input, coarse){
 					else outputData[frame]=outputData[frame-1];
 				}//Frames
 			}//Channels
-			console.log("coarse")
 		}//end scriptNode audio processing handler
 
 		input.connect(scriptNode);
@@ -187,7 +185,34 @@ Graph.prototype.crush = function(input, crush){
 		return input
 }//End Crush
 
+//Cut
+Graph.prototype.cut = function(cut, sample_name){
+	if (cut!=0 && !isNaN(parseInt(cut))){
+		if(isNaN(cut)) cut = parseInt(cut)
+		var group = {cutGroup: cut, node: this, sampleName: sample_name}
 
+		for(var i =0; i<this.cutGroups.length; i++){
+			if(group.cutGroup > 0){
+				if(this.cutGroups[i].cutGroup == group.cutGroup){
+					this.cutGroups[i].node.stop(this.when);
+					this.cutGroups.splice(i,1);
+					this.cutGroups.push(group);
+					return;
+				}
+			}
+			else{
+				if(this.cutGroups[i].cutGroup == group.cutGroup && group.sampleName==this.cutGroups[i].sampleName){
+
+					this.cutGroups[i].node.stop(this.when);
+					this.cutGroups.splice(i,1);
+					this.cutGroups.push(group);
+					return;
+				}
+			}
+		}
+		this.cutGroups.push(group);
+	}
+}//End Cut
 
 //@gain on first hit of something with a delay
 Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
@@ -243,18 +268,24 @@ Graph.prototype.highPassFilter = function (input, hcutoff, hresonance){
 	else return input;
 }
 
-//Loop effect
+//Loop effect 
+//@Calibrate w/ accelerate when accelerate is fully working
+//@get duration of buffer before it is loaded?
 Graph.prototype.loop = function(input, loopCount){
 
 	if(isNaN(parseInt(loopCount)) || loopCount==0) return input
-
+	//Can't get duration of buffer if isn't loaded yet @
+	try{
 	var dur = this.source.buffer.duration-(this.begin*this.source.buffer.duration)-((1-this.end)*this.source.buffer.duration);
 	this.source.loop=true;
 	this.source.loopStart = this.begin*this.source.buffer.duration
 	this.source.loopEnd = this.end*this.source.buffer.duration
-	this.source.stop(this.ac.currentTime+(dur*loopCount)/this.source.playbackRate.value);
-
+	this.source.stop(this.when+(dur*loopCount)/this.source.playbackRate.value);
 	return input;
+	}catch(e){
+		console.log("Warning: buffer data not yet available to calculate loop time - no looping applied")
+		return input
+	}
 }
 
 Graph.prototype.lowPassFilter = function(input, cutoff, resonance){
@@ -385,7 +416,15 @@ Graph.prototype.shape = function (input, shape){
 		return input;
 }
 
-// //Unit
+Graph.prototype.stop = function(time){
+	//setValueAtTime required so linearRampToValue doesn't start immediately
+	this.gain.gain.setValueAtTime(this.gain.gain.value, time)
+	this.gain.gain.linearRampToValueAtTime(0,time + 0.02);
+
+	//@More to disconnect/stop for garbage collection
+}
+
+//Unit
 // Graph.prototype.unit = function(cps){
 // 	    a->accelerate = a->accelerate * a->speed * a->cps; // change rate by 1 per cycle
 //     a->speed = sample->info->frames * a->speed * a->cps / samplerate;

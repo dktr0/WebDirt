@@ -6,6 +6,8 @@ WebDirt = function(sampleMapUrl,sampleFolder,latency,readyCallback) {
   this.sampleMapUrl = sampleMapUrl;
   this.sampleFolder = sampleFolder;
   this.sampleBank = new SampleBank(this.sampleMapUrl,this.sampleFolder,readyCallback);
+
+  this.cutGroups = new Array;
 }
 
 // note: the constructor above does not initialize the Web Audio context.
@@ -68,8 +70,10 @@ WebDirt.prototype.queue = function(msg,latency) {
 
   this.compressor.connect(this.ac.destination)
 
-  var graph = new Graph(msg,this.ac,this.sampleBank,this.compressor);
+  var graph = new Graph(msg,this.ac,this.sampleBank,this.compressor,this.cutGroups);
+
 }
+
 
 WebDirt.prototype.playScore = function(score,latency,finishedCallback) {
   // where score is an array of message objects (each of which fulfills same expectations as the method 'queue' above)
