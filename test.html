@@ -46,6 +46,7 @@ WebDirt.prototype.testPlaybackOfSimpleMessage = function(){
 }
 
 WebDirt.prototype.testComplexMessage = function() {
+  this.initializeWebAudio();
   var msg = {};
   msg.sample_name = document.getElementById('sample_name').value;
   msg.sample_n = document.getElementById('sample_n').value;

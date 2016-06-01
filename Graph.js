@@ -33,11 +33,6 @@ function Graph(msg,ac,sampleBank,compressor){
 		},reattemptDelay);
 	}
 
-	//@Bug - if sample hasn't been loaded before this run and a scriptNode effect is used,
-	//this onend function won't fire and the scriptnode handlers will continuously be invoked
-
-	this.negativeAccelerateBuffer(this.source.buffer, msg.accelerate, this.speed);
-
 	//Accelerate
 	this.accelerate(msg.accelerate, msg.speed);
 	// Distortion
@@ -300,15 +295,22 @@ return curve;
 
 //Accelerate @Still working on negative values
 Graph.prototype.accelerate = function(accelerateValue, speed){
-	if(isNaN(parseInt(accelerateValue))) accelerateValue = 0;
+	if(isNaN(parseFloat(accelerateValue))) accelerateValue = 0;
+	
 	if(accelerateValue!=0){
+		accelerateValue=parseFloat(accelerateValue)
+
 		this.source.playbackRate.setValueAtTime(speed, this.when);
-		//If the final playbackrate will be negative... for now just
-		//choose a value close to zero@
-		if((speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate)<0)
-			this.source.playbackRate.linearRampToValueAtTime(0.1,this.when+this.source.buffer.duration);
+
+		var timeToReverse = Math.abs(speed/(speed-accelerateValue));
+
+		if(speed+accelerateValue<0){
+			this.source.buffer = this.negativeAccelerateBuffer(this.source.buffer, accelerateValue, speed);
+			this.source.playbackRate.linearRampToValueAtTime(0, this.when+(this.source.buffer.duration)*timeToReverse);
+			this.source.playbackRate.linearRampToValueAtTime(1,this.when+this.source.buffer.duration*(1-timeToReverse));
+		}
 		else
-			this.source.playbackRate.linearRampToValueAtTime(speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate,this.when+this.source.buffer.duration);
+			this.source.playbackRate.linearRampToValueAtTime((speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate),this.when+this.source.buffer.duration);
 	}
 }
 
@@ -316,21 +318,26 @@ Graph.prototype.negativeAccelerateBuffer = function(buffer, accelerateValue, spe
 	var frames = buffer.length;
 	var pcmData = new Float32Array(frames);
 	var newBuffer = this.ac.createBuffer(buffer.numberOfChannels, buffer.length, this.ac.sampleRate)
+	var newChannelData = new Float32Array(frames);
+	var zeroFrame = Math.abs(speed/(speed-accelerateValue))*frames//(speed/(speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate))/frames;
 
-	var zeroFrame = (speed/(this.source.buffer.length*accelerateValue/this.ac.sampleRate))*frames;
-	console.log(zeroFrame)
+	//var zeroFrame = Math.abs(speed/(speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate))*frames
 
-	// rate = speed+(frames)*(this.source.buffer.length*(accelerateValue)/this.ac.sampleRate)
-	// -speed/
+		console.log("zeroframe" +zeroFrame)
+	zeroFrame = Math.trunc(zeroFrame)
 
-	// (((speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate)) = rate*frames+speed
-	// 	0=rate*frames+speed
-	// 	-speed/rate=frames
+	for(var channel=0; channel<buffer.numberOfChannels; channel++){
+		buffer.copyFromChannel(pcmData,channel,0);
+		for(var frame=0; frame<zeroFrame; frame++){
+			newChannelData[frame]=pcmData[frame]
+		}
+		for(var frame=0; frame<zeroFrame; frame++){
+			newChannelData[frame+zeroFrame]=pcmData[zeroFrame-frame]
+		}
+		newBuffer.copyToChannel(newChannelData,channel,0);
+	}
 
-
-	// 	-speed)/frames
-
-
+	return newBuffer
 }
 
 
