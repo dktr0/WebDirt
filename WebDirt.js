@@ -49,7 +49,6 @@ WebDirt.prototype.initializeWebAudio = function() {
   this.silentNote.start();
   var closure = this;
   setTimeout(function() {
-    console.log("closure");
     closure.silentGain.disconnect(closure.ac.destination);
     closure.silentNote.disconnect(closure.silentGain);
     closure.silentNote.stop();
@@ -133,6 +132,45 @@ WebDirt.prototype.loadAndPlayScore = function(url,latency,readyCallback,finished
     closure.playScoreWhenReady(request.response,latency,readyCallback,finishedCallback);
   }
   request.send();
+}
+
+WebDirt.prototype.renderAndPlayScore = function(serverUrl,pattern,cps,cycles,latency,readyCallback,finishedCallback) {
+  this.initializeWebAudio();
+  if(latency == null) latency = this.latency;
+  window.WebSocket = window.WebSocket || window.MozWebSocket;
+  console.log("WebDirt.renderAndPlayScore: attempting websocket connection to " + serverUrl);
+  var socket = new WebSocket(serverUrl);
+  socket.onerror = function() {
+    console.log(" ERROR opening websocket connection to " + serverUrl);
+  };
+  socket.onopen = function() {
+    console.log(" websocket connection to " + serverUrl + " established");
+    try {
+      var msg = "{\"render\":" + JSON.stringify(pattern) + ",\"cps\":" + cps + ",\"cycles\":" + cycles + "}";
+      console.log(msg);
+      socket.send(msg);
+      // socket.send(JSON.stringify({render:pattern,cps:cps,cycles:cycles}));
+      console.log(" render request sent");
+    }
+    catch(e) {
+      console.log(" EXCEPTION during transmission of render request");
+      socket.close();
+    }
+  };
+  var closure = this;
+  socket.onmessage = function(m) {
+    var msg = JSON.parse(m.data);
+    if(! msg instanceof Array) {
+      console.log(" WebDirt warning: rendering socket received non-array message");
+      console.log(typeof msg);
+      globalX = msg;
+      return;
+    };
+    console.log(" received score from " + serverUrl);
+    closure.playScoreWhenReady(msg,latency,readyCallback,finishedCallback);
+    console.log(" closing websocket connection to " + serverUrl);
+    socket.close();
+  }
 }
 
 WebDirt.prototype.subscribeToTidalSocket = function(url,withLog) {
