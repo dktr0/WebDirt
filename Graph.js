@@ -32,7 +32,9 @@ function Graph(msg,ac,sampleBank,compressor, cutGroups){
 	}
 
 	//Accelerate
-	this.accelerate(msg.accelerate, msg.speed);
+//	this.accel(this.source.buffer, msg.accelerate, msg.speed);
+	this.accelerate(msg.accelerate, msg.speed)
+
 	//Cut
 	this.cut(msg.cut, msg.sample_name);
 	// Distortion
@@ -324,7 +326,7 @@ return curve;
 }
 
 
-//Accelerate @Still working on negative values
+//Accelerate @negative values aren't quite right
 Graph.prototype.accelerate = function(accelerateValue, speed){
 	if(isNaN(parseFloat(accelerateValue))) accelerateValue = 0;
 	
@@ -333,15 +335,26 @@ Graph.prototype.accelerate = function(accelerateValue, speed){
 
 		this.source.playbackRate.setValueAtTime(speed, this.when);
 
-		var timeToReverse = Math.abs(speed/(speed-accelerateValue));
+		var timeToReverse = Math.abs((this.source.buffer.length*accelerateValue/this.ac.sampleRate+speed)/speed)//Math.abs(speed/(speed-accelerateValue));
+		console.log(timeToReverse)
+		//Approximates the final playback speed arrived at when accelerate is used in Dirt
+		//final speed = speed + Frames/(speed+accelerate*frames/samplerate) * accelerate/sampleRate
+		var rampValue = speed+(this.source.buffer.length)*(accelerateValue)/(this.ac.sampleRate);
 
-		if(speed+accelerateValue<0){
+		console.log(rampValue)
+		if(rampValue<0){
+
 			this.source.buffer = this.negativeAccelerateBuffer(this.source.buffer, accelerateValue, speed);
-			this.source.playbackRate.linearRampToValueAtTime(0, this.when+(this.source.buffer.duration)*timeToReverse);
-			this.source.playbackRate.linearRampToValueAtTime(1,this.when+this.source.buffer.duration*(1-timeToReverse));
+			this.source.playbackRate.linearRampToValueAtTime(0, this.when+timeToReverse);
+			this.source.playbackRate.linearRampToValueAtTime(1,this.when+this.source.buffer.duration);
 		}
-		else
-			this.source.playbackRate.linearRampToValueAtTime((speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate),this.when+this.source.buffer.duration);
+		else{
+			try{		
+				this.source.playbackRate.linearRampToValueAtTime(rampValue,this.when+this.source.buffer.duration);
+			}catch(e){
+				console.log("Warning, buffer data not loaded, could not apply acclerate effect")
+			}
+		}
 	}
 }
 
@@ -352,9 +365,7 @@ Graph.prototype.negativeAccelerateBuffer = function(buffer, accelerateValue, spe
 	var newChannelData = new Float32Array(frames);
 	var zeroFrame = Math.abs(speed/(speed-accelerateValue))*frames//(speed/(speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate))/frames;
 
-	//var zeroFrame = Math.abs(speed/(speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate))*frames
-
-		console.log("zeroframe" +zeroFrame)
+	zeroFrame = frames*Math.abs((this.source.buffer.length*accelerateValue/this.ac.sampleRate+speed)/speed)/this.source.buffer.duration
 	zeroFrame = Math.trunc(zeroFrame)
 
 	for(var channel=0; channel<buffer.numberOfChannels; channel++){
@@ -362,13 +373,45 @@ Graph.prototype.negativeAccelerateBuffer = function(buffer, accelerateValue, spe
 		for(var frame=0; frame<zeroFrame; frame++){
 			newChannelData[frame]=pcmData[frame]
 		}
-		for(var frame=0; frame<zeroFrame; frame++){
+		for(var frame=0; frame<(frames-zeroFrame); frame++){
 			newChannelData[frame+zeroFrame]=pcmData[zeroFrame-frame]
 		}
 		newBuffer.copyToChannel(newChannelData,channel,0);
 	}
-
 	return newBuffer
+}
+
+//Another acclerate function:
+//More close to how accelerate is applied in Dirt, less efficient in this context@
+Graph.prototype.accel = function(buffer, accelerateValue, speed){
+	if(isNaN(parseFloat(accelerateValue))) accelerateValue = 0;
+	accelerateValue = parseFloat(accelerateValue)
+	//if buffer data isn't loaded yet, affect isn't applied
+	try{var frames = buffer.length;}
+	catch(e){
+		console.log("Warning, buffer data not loaded, accelerate effect not applied");
+		return
+	}
+	
+	var pcmData = new Float32Array(frames);
+	var newBuffer = this.ac.createBuffer(buffer.numberOfChannels, buffer.length, this.ac.sampleRate)
+	var newChannelData = new Float32Array(frames);
+
+	for(var channel=0; channel<buffer.numberOfChannels; channel++){
+		var startSpeed=speed
+		buffer.copyFromChannel(pcmData,channel,0);
+		var i=0;
+
+		for(var frame=0;frame<frames; frame=frame+startSpeed){
+			newChannelData[i]=pcmData[Math.round(frame)]
+			startSpeed = startSpeed+accelerateValue/this.ac.sampleRate
+			if (frame<0) break
+			i++
+		}
+		newBuffer.copyToChannel(newChannelData,channel,0);
+		console.log(newChannelData)
+	}
+	this.source.buffer = newBuffer
 }
 
 
