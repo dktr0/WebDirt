@@ -232,12 +232,13 @@ Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
 			console.log("warning: delayfeedback not a number, using default of 0.5");
 			delayFeedback = 0.5;
 		}
-		feedBackGain.gain.value= delayFeedback;
+		feedBackGain.gain.value= Math.min(Math.abs(delayFeedback), 0.995);
 		var delayGain = this.ac.createGain();
 		delayGain.gain.value = outputGain;
 		input.connect(delayNode);
 		delayNode.connect(feedBackGain);
 		delayNode.connect(delayGain);
+		delayGain.gain.setValueAtTime(delayGain.gain.value, this.when+parseFloat(delayTime))
 		feedBackGain.connect(delayNode);
 		return delayGain;
 	}
