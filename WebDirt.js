@@ -36,9 +36,13 @@ WebDirt.prototype.initializeWebAudio = function() {
     this.compressor.attack.value = 0.05;
     this.compressor.release.value = 0.1; //More slowly go back.
 
+    //this.convolver = this.ac.createConvolver();
+    //this.convolver.buffer = this.sampleBank.getBuffer("padlong", 0);
+
     console.log("WebDirt audio context created");
   }
   catch(e) {
+    console.log(e)
     alert('Web Audio API is not supported in this browser');
   }
   this.silentNote = this.ac.createOscillator();

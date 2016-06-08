@@ -71,6 +71,7 @@ WebDirt.prototype.testComplexMessage = function() {
   msg.begin = document.getElementById('begin').value;
   msg.end = document.getElementById('end').value;
   msg.cut = document.getElementById('cut').value;
+  msg.unit = document.getElementById('unit').value;
   msg.when = this.ac.currentTime+0.5;
 
 
@@ -119,6 +120,7 @@ function testRenderAndPlayScore() {
     <div>begin: <textarea id="begin"></textarea></div>
     <div>end: <textarea id="end"></textarea></div>
     <div>cut: <textarea id="cut"></textarea></div>
+    <div>unit: <textarea id="unit"></textarea></div>
 
 
     <button onclick="webDirt.testComplexMessage()">testComplexMessage</button>

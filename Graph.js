@@ -1,3 +1,4 @@
+var cps = 1;
 function Graph(msg,ac,sampleBank,compressor, cutGroups){
 	this.cutGroups=cutGroups
 	this.ac = ac;
@@ -32,8 +33,8 @@ function Graph(msg,ac,sampleBank,compressor, cutGroups){
 	}
 
 	//Accelerate
-//	this.accel(this.source.buffer, msg.accelerate, msg.speed);
-	this.accelerate(msg.accelerate, msg.speed)
+	this.accel(this.source.buffer, msg.accelerate, msg.speed);
+	//this.accelerate(msg.accelerate, msg.speed)
 
 	//Cut
 	this.cut(msg.cut, msg.sample_name);
@@ -55,6 +56,8 @@ function Graph(msg,ac,sampleBank,compressor, cutGroups){
 	last = this.coarse(last, msg.coarse);
 	//Crush
 	last = this.crush(last, msg.crush);
+	//
+	this.unit(msg.unit,msg.speed)
 
 	//Gain
 	if(isNaN(parseInt(msg.gain))) msg.gain = 1;
@@ -118,7 +121,7 @@ Graph.prototype.bandPassFilter=function(input, bandf, bandq){
 	if(bandf>0 && bandf<1 && bandq>0){
 			filterNode = this.ac.createBiquadFilter();
 			filterNode.type = 'bandpass';
-			filterNode.frequency.value = bandf*10000;
+			filterNode.frequency.value = bandf;
 			filterNode.Q.value = bandq;
 
 			input.connect(filterNode);
@@ -216,7 +219,7 @@ Graph.prototype.cut = function(cut, sample_name){
 	}
 }//End Cut
 
-//@gain on first hit of something with a delay
+//Delay effect
 Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
 	if(isNaN(parseInt(outputGain))) outputGain = 0;
 	outputGain = Math.abs(outputGain);
@@ -243,7 +246,7 @@ Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
 		return delayGain;
 	}
 	else return input;
-}
+}//End Delay
 
 
 Graph.prototype.highPassFilter = function (input, hcutoff, hresonance){
@@ -252,7 +255,7 @@ Graph.prototype.highPassFilter = function (input, hcutoff, hresonance){
 			//Filtering
 			filterNode = this.ac.createBiquadFilter();
 			filterNode.type = 'highpass';
-			filterNode.frequency.value = hcutoff*10000;
+			filterNode.frequency.value = hcutoff;
 			filterNode.Q.value = 0.1;
 			input.connect(filterNode);
 			input = filterNode;
@@ -260,7 +263,7 @@ Graph.prototype.highPassFilter = function (input, hcutoff, hresonance){
 			//Resonance@
 			filterNode = this.ac.createBiquadFilter();
 			filterNode.type = 'peaking';
-			filterNode.frequency.value = hcutoff*10000+100;
+			filterNode.frequency.value = hcutoff;
 			filterNode.Q.value=70;
 			filterNode.gain.value = hresonance*10;
 			input.connect(filterNode);
@@ -293,22 +296,23 @@ Graph.prototype.loop = function(input, loopCount){
 
 Graph.prototype.lowPassFilter = function(input, cutoff, resonance){
 
-	if(resonance>0 && resonance<=1 && cutoff>0 && cutoff<=1){
-
+	if(cutoff>0 && cutoff<=1){
+//resonance>0 && resonance<=1 && 
 			var filterNode = this.ac.createBiquadFilter();
 			filterNode.type = 'lowpass';
-			filterNode.frequency.value = cutoff*14000;
-			filterNode.Q.value = 0.1;
+			filterNode.frequency.value = cutoff;
+			filterNode.Q.value = resonance
+			console.log(resonance)
 
 			input.connect(filterNode);
 			input = filterNode;
 
-			filterNode = this.ac.createBiquadFilter();
-			filterNode.type = 'peaking';
-			filterNode.frequency.value = cutoff*1400+100;
-			filterNode.Q.value=70;
-			filterNode.gain.value = resonance*10;
-			input.connect(filterNode);
+			// filterNode = this.ac.createBiquadFilter();
+			// filterNode.type = 'peaking';
+			// filterNode.frequency.value = cutoff*14000;
+			// filterNode.Q.value=resonance;
+			// filterNode.gain.value = resonance*15;
+			// input.connect(filterNode);
 			return filterNode;
 	}
 	else return input
@@ -465,66 +469,83 @@ Graph.prototype.stop = function(time){
 	this.gain.gain.setValueAtTime(this.gain.gain.value, time)
 	this.gain.gain.linearRampToValueAtTime(0,time + 0.02);
 
-	//@More to disconnect/stop for garbage collection
+	//@More to disconnect/stop for garbage collection?
 }
 
 //Unit
-// Graph.prototype.unit = function(cps){
-// 	    a->accelerate = a->accelerate * a->speed * a->cps; // change rate by 1 per cycle
-//     a->speed = sample->info->frames * a->speed * a->cps / samplerate;
-//     if (isNaN(parseInt(cps)) || cps==null) cps = 1
-
-//     this.accelerate = this.accelerate*this.speed*cps;
-// 	this.speed = this.speed*
-// }
+Graph.prototype.unit = function(unit, speed){
+	   //  a->accelerate = a->accelerate * a->speed * a->cps; // change rate by 1 per cycle
+    // a->speed = sample->info->frames * a->speed * a->cps / samplerate;
+    console.log("playback rate: "+(this.source.playbackRate.value))
+    if (unit == 'c')
+    	this.source.playbackRate.value = this.source.playbackRate.value*this.source.buffer.duration/cps;//this.source.buffer.length*speed*cps/this.ac.sampleRate+this.source.playbackRate.value;
+    
+}
 
 //Vowel effect
 //@ get frequencies from superdirt
 Graph.prototype.vowel= function (input, vowel){
+	vowel = vowel.toLowerCase();
 	if (vowel=='a'||vowel=='e'||vowel=='i'||vowel=='o'||vowel=='u'){
-			var frequencies;
-			var q = [5/20,20/20,50/20];
-			var gain= this.ac.createGain();
+			var frequencies,q,gains;
+			var makeupGain = this.ac.createGain();
 
 			switch (vowel){
 				case('a'):
-					frequencies= [730,1090,2440];
+					frequencies= vowelFormant.a.freqs
+					q = vowelFormant.a.qs
+					gains = vowelFormant.a.amps
 					break
 				case('e'):
-					frequencies = [270,2290,3010];
+					frequencies= vowelFormant.e.freqs
+					q = vowelFormant.e.qs
+					gains = vowelFormant.e.amps
 					break
 				case('i'):
-					frequencies = [390, 1990,2550];
+					frequencies= vowelFormant.i.freqs
+					q = vowelFormant.i.qs
+					gains = vowelFormant.i.amps
 					break;
 				case('o'):
-					frequencies = [360,1390, 1090];
+					frequencies= vowelFormant.o.freqs
+					q = vowelFormant.o.qs
+					gains = vowelFormant.o.amps
 					break;
 				case('u'):
-					frequencies = [520,1190, 2390];
+					frequencies= vowelFormant.u.freqs
+					q = vowelFormant.u.qs
+					gains = vowelFormant.u.amps
 			}
-			for(var i=0; i<3; i++){
-				filterNode = this.ac.createBiquadFilter()
+			for(var i=0; i<5; i++){
+				var gain = this.ac.createGain();
+				gain.gain.value = gains[i];
+				var filterNode = this.ac.createBiquadFilter()
 				filterNode.type = 'bandpass'
-				filterNode.Q.value=1;
+				filterNode.Q.value=q[i]/8;
 				filterNode.frequency.value=frequencies[i];
-
 				input.connect(filterNode);
-				//temp.connect(gain);
-				input=filterNode;
+				filterNode.connect(gain)
+				gain.connect(makeupGain)
+			
 			}
-			var makeupGain = this.ac.createGain();
-			makeupGain.gain.value=20;
-			filterNode.connect(makeupGain);
+			//@how much makeup gain to add? 
+			makeupGain.gain.value=3;
 			return makeupGain;
 	}
 	else return input
 }
 
 
+vowelFormant = { 
+	a: {freqs:[660, 1120, 2750, 3000,3350],  amps: [1, 0.5012, 0.0708, 0.0631, 0.0126], qs:[80, 90, 120, 130, 140]},
+	e: {freqs:[440, 1800, 2700, 3000, 3300], amps: [1, 0.1995, 0.1259, 0.1, 0.1], qs: [70, 80, 100, 120, 120]},
+	i: {freqs:[270, 1850, 2900, 3350, 3590], amps: [1, 0.0631, 0.0631, 0.0158, 0.0158], qs:[40, 90, 100, 120, 120]},
+	o: {freqs:[430, 820, 2700, 3000, 3300], amps: [1, 0.3162, 0.0501, 0.0794, 0.01995], qs: [40, 80, 100, 120, 120]},
+	u: {freqs:[370, 630, 2750, 3000, 3400], amps: [ 1, 0.1, 0.0708, 0.0316, 0.01995], qs: [40, 60, 100, 120, 120]}
+}
+
+
 /* Some older functions for effects, may want to refer back to them eventually
-
-
-
 //Returns a new BufferSourceNode containing a buffer with the reversed frames of the
 //parameter 'buffer'
 //@add add more for multi-channel samples
