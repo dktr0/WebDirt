@@ -61,6 +61,13 @@ WebDirt.prototype.initializeWebAudio = function() {
 WebDirt.prototype.queue = function(msg,latency) {
   this.initializeWebAudio();
   if(latency == null) latency = this.latency;
+  if(msg.whenPosix != null) {
+    // a little hack to allow sample times to be specified in POSIX epoch
+    // it would be better to only calculate the difference between web audio time and POSIX time infrequently
+    // and even better still for WebDirt clients to interrogate the web audio context time
+    // and use that in the generation of times for WebDirt events
+    msg.when = msg.whenPosix - (((new Date).getTime()/1000.0) - this.ac.currentTime);
+  }
 	if(msg.when==null) msg.when = this.ac.currentTime; // a sample without a 'when' is played 'now'(+latency)
   msg.when = msg.when + latency;
 
