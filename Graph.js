@@ -251,7 +251,7 @@ Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
 
 Graph.prototype.highPassFilter = function (input, hcutoff, hresonance){
 
-	if(hresonance>0 && hresonance<1 && hcutoff>0 && hcutoff<1){
+	if(hresonance>0 && hresonance<1 && hcutoff>0){
 			//Filtering
 			filterNode = this.ac.createBiquadFilter();
 			filterNode.type = 'highpass';
@@ -296,13 +296,12 @@ Graph.prototype.loop = function(input, loopCount){
 
 Graph.prototype.lowPassFilter = function(input, cutoff, resonance){
 
-	if(cutoff>0 && cutoff<=1){
+	if(cutoff>0 && resonance>0 && resonance<1){
 //resonance>0 && resonance<=1 && 
 			var filterNode = this.ac.createBiquadFilter();
 			filterNode.type = 'lowpass';
 			filterNode.frequency.value = cutoff;
 			filterNode.Q.value = resonance
-			console.log(resonance)
 
 			input.connect(filterNode);
 			input = filterNode;
@@ -483,8 +482,8 @@ Graph.prototype.unit = function(unit, speed){
 }
 
 //Vowel effect
-//@ get frequencies from superdirt
 Graph.prototype.vowel= function (input, vowel){
+	if (typeof vowel != 'string') return input;
 	vowel = vowel.toLowerCase();
 	if (vowel=='a'||vowel=='e'||vowel=='i'||vowel=='o'||vowel=='u'){
 			var frequencies,q,gains;
