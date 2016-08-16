@@ -1,8 +1,12 @@
-WebDirt = function(sampleMapUrl,sampleFolder,latency,readyCallback) {
+WebDirt = function(sampleMapUrl,sampleFolder,latency,readyCallback,maxLateness) {
   if(sampleMapUrl == null) sampleMapUrl = "sampleMap.json";
   if(sampleFolder == null) sampleFolder = "samples";
   if(latency == null) latency = 0.4;
   this.latency = latency;
+  if(typeof maxLateness != 'number') {
+    this.maxLateness = 0.005;
+  } else this.maxLateness = maxLateness;
+  console.log("WebDirt maximum lateness = " + this.maxLateness);
   this.sampleMapUrl = sampleMapUrl;
   this.sampleFolder = sampleFolder;
   this.sampleBank = new SampleBank(this.sampleMapUrl,this.sampleFolder,readyCallback);
@@ -35,6 +39,7 @@ WebDirt.prototype.initializeWebAudio = function() {
     this.compressor.reduction.value = 0; //No gain reduction
     this.compressor.attack.value = 0.05;
     this.compressor.release.value = 0.1; //More slowly go back.
+    this.compressor.connect(this.ac.destination);
 
     //this.convolver = this.ac.createConvolver();
     //this.convolver.buffer = this.sampleBank.getBuffer("padlong", 0);
@@ -77,12 +82,13 @@ WebDirt.prototype.queue = function(msg,latency) {
 	if(msg.when==null) msg.when = this.ac.currentTime; // a sample without a 'when' is played 'now'(+latency)
   msg.when = msg.when + latency;
 
-  if(msg.when < this.ac.currentTime) console.log("WebDirt warning: msg late by " + (this.ac.currentTime-msg.when) + " seconds" );
-
-  this.compressor.connect(this.ac.destination)
+  if(typeof msg.maxLateness != 'number') msg.maxLateness = this.maxLateness; // if specific maxLateness not set, use default embedded in WebDirt object
+  if((this.ac.currentTime - msg.when)>msg.maxLateness) {
+    console.log("WebDirt warning: dropping msg late by " + (this.ac.currentTime-msg.when) + " seconds" );
+    return;
+  }
 
   var graph = new Graph(msg,this.ac,this.sampleBank,this.compressor,this.cutGroups);
-
 }
 
 
