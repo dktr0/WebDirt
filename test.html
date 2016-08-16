@@ -42,7 +42,7 @@ WebDirt.prototype.testSampleBankGetsBuffer = function() {
 
 WebDirt.prototype.testPlaybackOfSimpleMessage = function(){
   var msg = { sample_name: 'cp', sample_n:0};
-  this.queue(msg);
+  this.playSample(msg);
 }
 
 WebDirt.prototype.testComplexMessage = function() {
@@ -75,7 +75,7 @@ WebDirt.prototype.testComplexMessage = function() {
   msg.when = this.ac.currentTime+0.5;
 
 
-  this.queue(msg);
+  this.playSample(msg);
 }
 
 function testRenderAndPlayScore() {

@@ -17,7 +17,7 @@ WebDirt = function(sampleMapUrl,sampleFolder,latency,readyCallback,maxLateness) 
 // note: the constructor above does not initialize the Web Audio context.
 // this is deliberate in order to support the way things work on iOS, where
 // the audio context must be initialized in response to a user interaction.
-// each of the methods below the next method (queue, playScore, playScoreWhenReady,
+// each of the methods below the next method (playSample, playScore, playScoreWhenReady,
 // loadAndPlayScore,subscribeToTidalSocket) call initializeWebAudio (which has
 // been written to only allow itself to run once) so it is _not_ expected that you call
 // initializeWebAudio yourself. However, for things to work on iOS, you should
@@ -69,7 +69,7 @@ WebDirt.prototype.initializeWebAudio = function() {
 }
 
 
-WebDirt.prototype.queue = function(msg,latency) {
+WebDirt.prototype.playSample = function(msg,latency) {
   this.initializeWebAudio();
   if(latency == null) latency = this.latency;
   if(msg.whenPosix != null) {
@@ -93,7 +93,7 @@ WebDirt.prototype.queue = function(msg,latency) {
 
 
 WebDirt.prototype.playScore = function(score,latency,finishedCallback) {
-  // where score is an array of message objects (each of which fulfills same expectations as the method 'queue' above)
+  // where score is an array of message objects (each of which fulfills same expectations as the method 'playSample' above)
   // if no second argument (latency) is given, then latency defaults to latency default of this WebDirt instance
   this.initializeWebAudio();
   if(latency == null) latency = this.latency;
@@ -108,7 +108,7 @@ WebDirt.prototype.playScore = function(score,latency,finishedCallback) {
     if(msg.n != null) msg.sample_n = msg.n;
     // end: a temporary kludge
     // this.sampleBank.load(msg.sample_name,msg.sample_n); // make an early attempt to load samples, ahead of playback
-    this.queue(msg,latency);
+    this.playSample(msg,latency);
   }
   if(typeof finishedCallback == 'function') {
     setTimeout(function() {
@@ -248,8 +248,13 @@ WebDirt.prototype.subscribeToTidalSocket = function(url,withLog) {
         x.release = msg.args[32];
       }
 
-      closure.queue(x);
+      closure.playSample(x);
       if(withLog)console.log(msg);
     }
   };
+}
+
+WebDirt.prototype.getCurrentTime = function () {
+  this.ac.
+
 }

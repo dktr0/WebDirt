@@ -10,7 +10,7 @@ webDirt = new WebDirt();
 
 2. Then, you can play samples in 4 ways:
 ```
-webDirt.queue(msg); // play an individual sample
+webDirt.playSample(msg); // play an individual sample
 webDirt.playScore(score); // play an array of messages (a score)
 webDirt.loadAndPlayScore(url); // load a score from an arbitrary URL and play it when ready
 webDirt.subscribeToTidalSocket(url,withLog); // subscribe to a TidalSocket over WebSockets, logging is off if withLog == false
