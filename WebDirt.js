@@ -255,6 +255,5 @@ WebDirt.prototype.subscribeToTidalSocket = function(url,withLog) {
 }
 
 WebDirt.prototype.getCurrentTime = function () {
-  this.ac.
-
+  return this.ac.currentTime;
 }
