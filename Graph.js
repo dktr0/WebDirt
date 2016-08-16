@@ -1,9 +1,8 @@
-var OUTPUT_CHANNELS=2;
-
-function Graph(msg,ac,sampleBank,compressor){
+var cps = 1;
+function Graph(msg,ac,sampleBank,compressor, cutGroups){
+	this.cutGroups=cutGroups
 	this.ac = ac;
 	var last,temp;
-
 	this.when = msg.when;
 
 	// get basic buffer player, including speed change and sample reversal
@@ -33,11 +32,12 @@ function Graph(msg,ac,sampleBank,compressor){
 		},reattemptDelay);
 	}
 
-	//@Bug - if sample hasn't been loaded before this run and a scriptNode effect is used,
-	//this onend function won't fire and the scriptnode handlers will continuously be invoked
-
 	//Accelerate
-	this.accelerate(msg.accelerate, msg.speed);
+	this.accel(this.source.buffer, msg.accelerate, msg.speed);
+	//this.accelerate(msg.accelerate, msg.speed)
+
+	//Cut
+	this.cut(msg.cut, msg.sample_name);
 	// Distortion
 	last = this.shape(last, msg.shape);
 	//Lowpass filtering @what level/function to set frequency and resonant gain at?
@@ -56,14 +56,15 @@ function Graph(msg,ac,sampleBank,compressor){
 	last = this.coarse(last, msg.coarse);
 	//Crush
 	last = this.crush(last, msg.crush);
-	//Unit
+	//
+	this.unit(msg.unit,msg.speed)
 
 	//Gain
 	if(isNaN(parseInt(msg.gain))) msg.gain = 1;
-	var gain = ac.createGain();
-	gain.gain.value = Math.abs(Math.pow(msg.gain,4));
-	last.connect(gain);
-	var last = gain;
+	this.gain = ac.createGain();
+	this.gain.gain.value = Math.abs(Math.pow(msg.gain,4));
+	last.connect(this.gain);
+	var last = this.gain;
 
 	//Panning (currently stereo)
 	if(isNaN(parseInt(msg.pan))) msg.pan = 0.5;
@@ -79,11 +80,8 @@ function Graph(msg,ac,sampleBank,compressor){
 	var channelMerger = ac.createChannelMerger(2);
 	gain1.connect(channelMerger,0,0);
 	gain2.connect(channelMerger,0,1);
-	channelMerger.connect(this.ac.destination);
+	channelMerger.connect(compressor);
 
-
-
-	compressor.connect(this.ac.destination);
 }// End Graph
 
 
@@ -118,28 +116,12 @@ Graph.prototype.disconnectHandler = function() {
 ////////////////////////////////////////////
 
 
-//Accelerate @Still working on negative values
-Graph.prototype.accelerate = function(accelerateValue, speed){
-	if(isNaN(parseInt(accelerateValue))) accelerateValue = 0;
-	if(accelerateValue!=0){
-		this.source.playbackRate.setValueAtTime(speed, this.when);
-		//If the final playbackrate will be negative... for now just
-		//choose a value close to zero@
-		if((speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate)<0)
-			this.source.playbackRate.linearRampToValueAtTime(0.1,this.when+this.source.buffer.duration);
-		else
-			this.source.playbackRate.linearRampToValueAtTime(speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate,this.when+this.source.buffer.duration);
-	}
-
-
-}
-
 Graph.prototype.bandPassFilter=function(input, bandf, bandq){
 	//Bandpass Filter
 	if(bandf>0 && bandf<1 && bandq>0){
 			filterNode = this.ac.createBiquadFilter();
 			filterNode.type = 'bandpass';
-			filterNode.frequency.value = bandf*10000;
+			filterNode.frequency.value = bandf;
 			filterNode.Q.value = bandq;
 
 			input.connect(filterNode);
@@ -168,7 +150,6 @@ Graph.prototype.coarse = function(input, coarse){
 					else outputData[frame]=outputData[frame-1];
 				}//Frames
 			}//Channels
-			console.log("coarse")
 		}//end scriptNode audio processing handler
 
 		input.connect(scriptNode);
@@ -209,9 +190,36 @@ Graph.prototype.crush = function(input, crush){
 		return input
 }//End Crush
 
+//Cut
+Graph.prototype.cut = function(cut, sample_name){
+	if (cut!=0 && !isNaN(parseInt(cut))){
+		if(isNaN(cut)) cut = parseInt(cut)
+		var group = {cutGroup: cut, node: this, sampleName: sample_name}
 
+		for(var i =0; i<this.cutGroups.length; i++){
+			if(group.cutGroup > 0){
+				if(this.cutGroups[i].cutGroup == group.cutGroup){
+					this.cutGroups[i].node.stop(this.when);
+					this.cutGroups.splice(i,1);
+					this.cutGroups.push(group);
+					return;
+				}
+			}
+			else{
+				if(this.cutGroups[i].cutGroup == group.cutGroup && group.sampleName==this.cutGroups[i].sampleName){
 
-//@gain on first hit of something with a delay
+					this.cutGroups[i].node.stop(this.when);
+					this.cutGroups.splice(i,1);
+					this.cutGroups.push(group);
+					return;
+				}
+			}
+		}
+		this.cutGroups.push(group);
+	}
+}//End Cut
+
+//Delay effect
 Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
 	if(isNaN(parseInt(outputGain))) outputGain = 0;
 	outputGain = Math.abs(outputGain);
@@ -227,17 +235,18 @@ Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
 			console.log("warning: delayfeedback not a number, using default of 0.5");
 			delayFeedback = 0.5;
 		}
-		feedBackGain.gain.value= delayFeedback;
+		feedBackGain.gain.value= Math.min(Math.abs(delayFeedback), 0.995);
 		var delayGain = this.ac.createGain();
 		delayGain.gain.value = outputGain;
 		input.connect(delayNode);
 		delayNode.connect(feedBackGain);
 		delayNode.connect(delayGain);
+		delayGain.gain.setValueAtTime(delayGain.gain.value, this.when+parseFloat(delayTime))
 		feedBackGain.connect(delayNode);
 		return delayGain;
 	}
 	else return input;
-}
+}//End Delay
 
 
 Graph.prototype.highPassFilter = function (input, hcutoff, hresonance){
@@ -246,7 +255,7 @@ Graph.prototype.highPassFilter = function (input, hcutoff, hresonance){
 			//Filtering
 			filterNode = this.ac.createBiquadFilter();
 			filterNode.type = 'highpass';
-			filterNode.frequency.value = hcutoff*10000;
+			filterNode.frequency.value = hcutoff;
 			filterNode.Q.value = 0.1;
 			input.connect(filterNode);
 			input = filterNode;
@@ -254,7 +263,7 @@ Graph.prototype.highPassFilter = function (input, hcutoff, hresonance){
 			//Resonance@
 			filterNode = this.ac.createBiquadFilter();
 			filterNode.type = 'peaking';
-			filterNode.frequency.value = hcutoff*10000+100;
+			filterNode.frequency.value = hcutoff;
 			filterNode.Q.value=70;
 			filterNode.gain.value = hresonance*10;
 			input.connect(filterNode);
@@ -265,38 +274,45 @@ Graph.prototype.highPassFilter = function (input, hcutoff, hresonance){
 	else return input;
 }
 
-//Loop effect
+//Loop effect 
+//@Calibrate w/ accelerate when accelerate is fully working
+//@get duration of buffer before it is loaded?
 Graph.prototype.loop = function(input, loopCount){
 
 	if(isNaN(parseInt(loopCount)) || loopCount==0) return input
-
+	//Can't get duration of buffer if isn't loaded yet @
+	try{
 	var dur = this.source.buffer.duration-(this.begin*this.source.buffer.duration)-((1-this.end)*this.source.buffer.duration);
 	this.source.loop=true;
 	this.source.loopStart = this.begin*this.source.buffer.duration
 	this.source.loopEnd = this.end*this.source.buffer.duration
-	this.source.stop(this.ac.currentTime+(dur*loopCount)/this.source.playbackRate.value);
-
+	this.source.stop(this.when+(dur*loopCount)/this.source.playbackRate.value);
 	return input;
+	}catch(e){
+		console.log("Warning: buffer data not yet available to calculate loop time - no looping applied")
+		return input
+	}
 }
 
 Graph.prototype.lowPassFilter = function(input, cutoff, resonance){
 
-	if(resonance>0 && resonance<=1 && cutoff>0 && cutoff<=1){
-
+	if(cutoff>0 && cutoff<=1){
+//resonance>0 && resonance<=1 && 
 			var filterNode = this.ac.createBiquadFilter();
 			filterNode.type = 'lowpass';
-			filterNode.frequency.value = cutoff*14000;
-			filterNode.Q.value = 0.1;
+			filterNode.frequency.value = cutoff;
+			filterNode.Q.value = resonance
+			console.log(resonance)
 
 			input.connect(filterNode);
 			input = filterNode;
 
-			filterNode = this.ac.createBiquadFilter();
-			filterNode.type = 'peaking';
-			filterNode.frequency.value = cutoff*1400+100;
-			filterNode.Q.value=70;
-			filterNode.gain.value = resonance*10;
-			input.connect(filterNode);
+			// filterNode = this.ac.createBiquadFilter();
+			// filterNode.type = 'peaking';
+			// filterNode.frequency.value = cutoff*14000;
+			// filterNode.Q.value=resonance;
+			// filterNode.gain.value = resonance*15;
+			// input.connect(filterNode);
 			return filterNode;
 	}
 	else return input
@@ -314,13 +330,94 @@ function makeDistortionCurve(amount){
 return curve;
 }
 
-// Graph.prototype.negativeAccelerateBuffer = function(buffer, accelerateValue){
-// 	var frames = buffer.length;
-// 	var pcmData = new Float32Array(frames);
-// 	var newBuffer = this.ac.createBuffer(buffer.numberOfChannels, buffer.length, this.ac.sampleRate)
 
+//Accelerate @negative values aren't quite right
+Graph.prototype.accelerate = function(accelerateValue, speed){
+	if(isNaN(parseFloat(accelerateValue))) accelerateValue = 0;
+	
+	if(accelerateValue!=0){
+		accelerateValue=parseFloat(accelerateValue)
 
-// }
+		this.source.playbackRate.setValueAtTime(speed, this.when);
+
+		var timeToReverse = Math.abs((this.source.buffer.length*accelerateValue/this.ac.sampleRate+speed)/speed)//Math.abs(speed/(speed-accelerateValue));
+		console.log(timeToReverse)
+		//Approximates the final playback speed arrived at when accelerate is used in Dirt
+		//final speed = speed + Frames/(speed+accelerate*frames/samplerate) * accelerate/sampleRate
+		var rampValue = speed+(this.source.buffer.length)*(accelerateValue)/(this.ac.sampleRate);
+
+		console.log(rampValue)
+		if(rampValue<0){
+
+			this.source.buffer = this.negativeAccelerateBuffer(this.source.buffer, accelerateValue, speed);
+			this.source.playbackRate.linearRampToValueAtTime(0, this.when+timeToReverse);
+			this.source.playbackRate.linearRampToValueAtTime(1,this.when+this.source.buffer.duration);
+		}
+		else{
+			try{		
+				this.source.playbackRate.linearRampToValueAtTime(rampValue,this.when+this.source.buffer.duration);
+			}catch(e){
+				console.log("Warning, buffer data not loaded, could not apply acclerate effect")
+			}
+		}
+	}
+}
+
+Graph.prototype.negativeAccelerateBuffer = function(buffer, accelerateValue, speed){
+	var frames = buffer.length;
+	var pcmData = new Float32Array(frames);
+	var newBuffer = this.ac.createBuffer(buffer.numberOfChannels, buffer.length, this.ac.sampleRate)
+	var newChannelData = new Float32Array(frames);
+	var zeroFrame = Math.abs(speed/(speed-accelerateValue))*frames//(speed/(speed+this.source.buffer.length*(accelerateValue)/this.ac.sampleRate))/frames;
+
+	zeroFrame = frames*Math.abs((this.source.buffer.length*accelerateValue/this.ac.sampleRate+speed)/speed)/this.source.buffer.duration
+	zeroFrame = Math.trunc(zeroFrame)
+
+	for(var channel=0; channel<buffer.numberOfChannels; channel++){
+		buffer.copyFromChannel(pcmData,channel,0);
+		for(var frame=0; frame<zeroFrame; frame++){
+			newChannelData[frame]=pcmData[frame]
+		}
+		for(var frame=0; frame<(frames-zeroFrame); frame++){
+			newChannelData[frame+zeroFrame]=pcmData[zeroFrame-frame]
+		}
+		newBuffer.copyToChannel(newChannelData,channel,0);
+	}
+	return newBuffer
+}
+
+//Another acclerate function:
+//More close to how accelerate is applied in Dirt, less efficient in this context@
+Graph.prototype.accel = function(buffer, accelerateValue, speed){
+	if(isNaN(parseFloat(accelerateValue))) accelerateValue = 0;
+	accelerateValue = parseFloat(accelerateValue)
+	//if buffer data isn't loaded yet, affect isn't applied
+	try{var frames = buffer.length;}
+	catch(e){
+		console.log("Warning, buffer data not loaded, accelerate effect not applied");
+		return
+	}
+	
+	var pcmData = new Float32Array(frames);
+	var newBuffer = this.ac.createBuffer(buffer.numberOfChannels, buffer.length, this.ac.sampleRate)
+	var newChannelData = new Float32Array(frames);
+
+	for(var channel=0; channel<buffer.numberOfChannels; channel++){
+		var startSpeed=speed
+		buffer.copyFromChannel(pcmData,channel,0);
+		var i=0;
+
+		for(var frame=0;frame<frames; frame=frame+startSpeed){
+			newChannelData[i]=pcmData[Math.round(frame)]
+			startSpeed = startSpeed+accelerateValue/this.ac.sampleRate
+			if (frame<0) break
+			i++
+		}
+		newBuffer.copyToChannel(newChannelData,channel,0);
+		console.log(newChannelData)
+	}
+	this.source.buffer = newBuffer
+}
 
 
 //Returns a new BufferSourceNode containing a buffer with the reversed frames of the
@@ -367,63 +464,88 @@ Graph.prototype.shape = function (input, shape){
 		return input;
 }
 
-// //Unit
-// Graph.prototype.unit = function(cps){
-// 	    a->accelerate = a->accelerate * a->speed * a->cps; // change rate by 1 per cycle
-//     a->speed = sample->info->frames * a->speed * a->cps / samplerate;
-//     if (isNaN(parseInt(cps)) || cps==null) cps = 1
+Graph.prototype.stop = function(time){
+	//setValueAtTime required so linearRampToValue doesn't start immediately
+	this.gain.gain.setValueAtTime(this.gain.gain.value, time)
+	this.gain.gain.linearRampToValueAtTime(0,time + 0.02);
 
-//     this.accelerate = this.accelerate*this.speed*cps;
-// 	this.speed = this.speed*
-// }
+	//@More to disconnect/stop for garbage collection?
+}
+
+//Unit
+Graph.prototype.unit = function(unit, speed){
+	   //  a->accelerate = a->accelerate * a->speed * a->cps; // change rate by 1 per cycle
+    // a->speed = sample->info->frames * a->speed * a->cps / samplerate;
+    console.log("playback rate: "+(this.source.playbackRate.value))
+    if (unit == 'c')
+    	this.source.playbackRate.value = this.source.playbackRate.value*this.source.buffer.duration/cps;//this.source.buffer.length*speed*cps/this.ac.sampleRate+this.source.playbackRate.value;
+    
+}
 
 //Vowel effect
 //@ get frequencies from superdirt
 Graph.prototype.vowel= function (input, vowel){
+	vowel = vowel.toLowerCase();
 	if (vowel=='a'||vowel=='e'||vowel=='i'||vowel=='o'||vowel=='u'){
-			var frequencies;
-			var q = [5/20,20/20,50/20];
-			var gain= this.ac.createGain();
+			var frequencies,q,gains;
+			var makeupGain = this.ac.createGain();
 
 			switch (vowel){
 				case('a'):
-					frequencies= [730,1090,2440];
+					frequencies= vowelFormant.a.freqs
+					q = vowelFormant.a.qs
+					gains = vowelFormant.a.amps
 					break
 				case('e'):
-					frequencies = [270,2290,3010];
+					frequencies= vowelFormant.e.freqs
+					q = vowelFormant.e.qs
+					gains = vowelFormant.e.amps
 					break
 				case('i'):
-					frequencies = [390, 1990,2550];
+					frequencies= vowelFormant.i.freqs
+					q = vowelFormant.i.qs
+					gains = vowelFormant.i.amps
 					break;
 				case('o'):
-					frequencies = [360,1390, 1090];
+					frequencies= vowelFormant.o.freqs
+					q = vowelFormant.o.qs
+					gains = vowelFormant.o.amps
 					break;
 				case('u'):
-					frequencies = [520,1190, 2390];
+					frequencies= vowelFormant.u.freqs
+					q = vowelFormant.u.qs
+					gains = vowelFormant.u.amps
 			}
-			for(var i=0; i<3; i++){
-				filterNode = this.ac.createBiquadFilter()
+			for(var i=0; i<5; i++){
+				var gain = this.ac.createGain();
+				gain.gain.value = gains[i];
+				var filterNode = this.ac.createBiquadFilter()
 				filterNode.type = 'bandpass'
-				filterNode.Q.value=1;
+				filterNode.Q.value=q[i]/8;
 				filterNode.frequency.value=frequencies[i];
-
 				input.connect(filterNode);
-				//temp.connect(gain);
-				input=filterNode;
+				filterNode.connect(gain)
+				gain.connect(makeupGain)
+			
 			}
-			var makeupGain = this.ac.createGain();
-			makeupGain.gain.value=20;
-			filterNode.connect(makeupGain);
+			//@how much makeup gain to add? 
+			makeupGain.gain.value=3;
 			return makeupGain;
 	}
 	else return input
 }
 
 
+vowelFormant = { 
+	a: {freqs:[660, 1120, 2750, 3000,3350],  amps: [1, 0.5012, 0.0708, 0.0631, 0.0126], qs:[80, 90, 120, 130, 140]},
+	e: {freqs:[440, 1800, 2700, 3000, 3300], amps: [1, 0.1995, 0.1259, 0.1, 0.1], qs: [70, 80, 100, 120, 120]},
+	i: {freqs:[270, 1850, 2900, 3350, 3590], amps: [1, 0.0631, 0.0631, 0.0158, 0.0158], qs:[40, 90, 100, 120, 120]},
+	o: {freqs:[430, 820, 2700, 3000, 3300], amps: [1, 0.3162, 0.0501, 0.0794, 0.01995], qs: [40, 80, 100, 120, 120]},
+	u: {freqs:[370, 630, 2750, 3000, 3400], amps: [ 1, 0.1, 0.0708, 0.0316, 0.01995], qs: [40, 60, 100, 120, 120]}
+}
+
+
 /* Some older functions for effects, may want to refer back to them eventually
-
-
-
 //Returns a new BufferSourceNode containing a buffer with the reversed frames of the
 //parameter 'buffer'
 //@add add more for multi-channel samples

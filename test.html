@@ -46,6 +46,7 @@ WebDirt.prototype.testPlaybackOfSimpleMessage = function(){
 }
 
 WebDirt.prototype.testComplexMessage = function() {
+  this.initializeWebAudio();
   var msg = {};
   msg.sample_name = document.getElementById('sample_name').value;
   msg.sample_n = document.getElementById('sample_n').value;
@@ -69,7 +70,10 @@ WebDirt.prototype.testComplexMessage = function() {
   msg.loop = document.getElementById('loop').value;
   msg.begin = document.getElementById('begin').value;
   msg.end = document.getElementById('end').value;
+  msg.cut = document.getElementById('cut').value;
+  msg.unit = document.getElementById('unit').value;
   msg.when = this.ac.currentTime+0.5;
+
 
   this.queue(msg);
 }
@@ -113,8 +117,10 @@ function testRenderAndPlayScore() {
     <div>delaytime: <textarea id="delaytime"></textarea></div>
     <div>delayfeedback: <textarea id="delayfeedback"></textarea></div>
     <div>loop: <textarea id="loop"></textarea></div>
-     <div>begin: <textarea id="begin"></textarea></div>
+    <div>begin: <textarea id="begin"></textarea></div>
     <div>end: <textarea id="end"></textarea></div>
+    <div>cut: <textarea id="cut"></textarea></div>
+    <div>unit: <textarea id="unit"></textarea></div>
 
 
     <button onclick="webDirt.testComplexMessage()">testComplexMessage</button>
