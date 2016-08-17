@@ -257,3 +257,28 @@ WebDirt.prototype.subscribeToTidalSocket = function(url,withLog) {
 WebDirt.prototype.getCurrentTime = function () {
   return this.ac.currentTime;
 }
+
+WebDirt.prototype.syncWithEsp = function (url) {
+  if(typeof EspClient != 'function') {
+    console.log("WebDirt ERROR: syncWithEsp called but EspClient does not exist");
+    return;
+  }
+  if(this.espClient == null) {
+    this.espClient = new EspClient(url,this.ac);
+    var closure;
+    this.espClient.tempoCallback = function (x) {
+      closure.tempo = x;
+    };
+  }
+  else {
+    this.espClient.setUrl(url);
+  }
+}
+
+WebDirt.prototype.setTempo = function(x) {
+  if(typeof x.time != 'number') throw Error("WebDirt: no time in setTempo");
+  if(typeof x.beats != 'number') throw Error("WebDirt: no beats in setTempo");
+  if(typeof x.bpm != 'number') throw Error("WebDirt: no bpm in setTempo");
+  if(this.espClient != null) this.espClient.sendSetTempo(x);
+  this.tempo = x;
+}
