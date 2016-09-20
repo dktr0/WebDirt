@@ -11,30 +11,40 @@ function Graph(msg,ac,sampleBank,compressor, cutGroups){
 	if(isNaN(parseInt(msg.end))) msg.end = 1;
 	this.begin = msg.begin;
 	this.end = msg.end;
+
 	var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
+
 	if(isNaN(parseInt(msg.speed))) msg.speed = 1;
-	if(msg.speed>=0 && buffer != null) this.source.buffer = buffer;
-	if(msg.speed<0 && buffer != null)  this.source.buffer=this.reverseBuffer(buffer)
+	//^if(msg.speed>=0 && buffer != null) this.source.buffer = buffer;
+	if(msg.speed<0 && buffer != null)  buffer =this.reverseBuffer(buffer) //^
 	msg.speed = Math.abs(msg.speed)
 	this.source.playbackRate.value = msg.speed;
 
-	if(buffer != null) this.start();
+	//Accelerate
+	//Note: because accelerate relies on manipulating raw buffer values, the buffer must be modified
+	//      before setting the source's buffer equal to something (the WA API doesn't allow for the
+	//      buffer property to be reset)
+	buffer = this.accel(buffer, msg.accelerate, msg.speed);
+
+	if(buffer != null) {
+		this.source.buffer = buffer;
+		this.start();
+	}
 	else { // buffer not available but may be available soon
 		var closure = this;
 		var reattemptDelay = (msg.when-ac.currentTime-0.2)*1000;
 		setTimeout(function(){
 			var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
+			//Still need to apply all effects that rely on buffer manipulation:
+			buffer = closure.accel(buffer,msg.accelerate,msg.speed);
 			if(buffer != null) {
 				closure.source.buffer = buffer;
 				closure.start();
 			}
-		  else console.log("unable to access sample " + msg.sample_name + ":" + msg.sample_n + " on second attempt");
+			else console.log("unable to access sample " + msg.sample_name + ":" + msg.sample_n + " on second attempt");
 		},reattemptDelay);
 	}
 
-	//Accelerate
-	this.accel(this.source.buffer, msg.accelerate, msg.speed);
-	//this.accelerate(msg.accelerate, msg.speed)
 
 	//Cut
 	this.cut(msg.cut, msg.sample_name);
@@ -52,12 +62,18 @@ function Graph(msg,ac,sampleBank,compressor, cutGroups){
 	last = this.delay(last,msg.delay,msg.delaytime,msg.delayfeedback);
 	//Loop
 	last = this.loop(last, msg.loop, msg.begin, msg.end, msg.speed);
-	//Coarse
-	last = this.coarse(last, msg.coarse);
 	//Crush
 	last = this.crush(last, msg.crush);
-	//
+	//Coarse
+	last = this.coarse(last, msg.coarse);
+
 	this.unit(msg.unit,msg.speed)
+
+
+  //this.ac.createBuffer(buffer.numberOfChannels, buffer.length, this.ac.sampleRate);
+
+
+
 
 	//Gain
 	if(isNaN(parseInt(msg.gain))) msg.gain = 1;
@@ -93,7 +109,7 @@ Graph.prototype.start = function() {
 Graph.prototype.disconnectOnEnd = function(x,y) {
 	var obj = {input:x,output:y};
 	if(this.disconnectQueue == null) this.disconnectQueue = new Array;
-	this.disconnectQueue.push(obj);
+	this.disconnectQueue.unshift(obj);
 }
 
 Graph.prototype.disconnectHandler = function() {
@@ -274,7 +290,7 @@ Graph.prototype.highPassFilter = function (input, hcutoff, hresonance){
 	else return input;
 }
 
-//Loop effect 
+//Loop effect
 //@Calibrate w/ accelerate when accelerate is fully working
 //@get duration of buffer before it is loaded?
 Graph.prototype.loop = function(input, loopCount){
@@ -297,7 +313,7 @@ Graph.prototype.loop = function(input, loopCount){
 Graph.prototype.lowPassFilter = function(input, cutoff, resonance){
 
 	if(cutoff>0 && resonance>0 && resonance<1){
-//resonance>0 && resonance<=1 && 
+//resonance>0 && resonance<=1 &&
 			var filterNode = this.ac.createBiquadFilter();
 			filterNode.type = 'lowpass';
 			filterNode.frequency.value = cutoff;
@@ -333,19 +349,18 @@ return curve;
 //Accelerate @negative values aren't quite right
 Graph.prototype.accelerate = function(accelerateValue, speed){
 	if(isNaN(parseFloat(accelerateValue))) accelerateValue = 0;
-	
+
 	if(accelerateValue!=0){
 		accelerateValue=parseFloat(accelerateValue)
 
 		this.source.playbackRate.setValueAtTime(speed, this.when);
 
 		var timeToReverse = Math.abs((this.source.buffer.length*accelerateValue/this.ac.sampleRate+speed)/speed)//Math.abs(speed/(speed-accelerateValue));
-		console.log(timeToReverse)
+
 		//Approximates the final playback speed arrived at when accelerate is used in Dirt
 		//final speed = speed + Frames/(speed+accelerate*frames/samplerate) * accelerate/sampleRate
 		var rampValue = speed+(this.source.buffer.length)*(accelerateValue)/(this.ac.sampleRate);
 
-		console.log(rampValue)
 		if(rampValue<0){
 
 			this.source.buffer = this.negativeAccelerateBuffer(this.source.buffer, accelerateValue, speed);
@@ -353,7 +368,7 @@ Graph.prototype.accelerate = function(accelerateValue, speed){
 			this.source.playbackRate.linearRampToValueAtTime(1,this.when+this.source.buffer.duration);
 		}
 		else{
-			try{		
+			try{
 				this.source.playbackRate.linearRampToValueAtTime(rampValue,this.when+this.source.buffer.duration);
 			}catch(e){
 				console.log("Warning, buffer data not loaded, could not apply acclerate effect")
@@ -388,15 +403,15 @@ Graph.prototype.negativeAccelerateBuffer = function(buffer, accelerateValue, spe
 //Another acclerate function:
 //More close to how accelerate is applied in Dirt, less efficient in this context@
 Graph.prototype.accel = function(buffer, accelerateValue, speed){
-	if(isNaN(parseFloat(accelerateValue))) accelerateValue = 0;
-	accelerateValue = parseFloat(accelerateValue)
+	if(isNaN(parseFloat(accelerateValue))) return buffer;
+	accelerateValue = parseFloat(accelerateValue);
 	//if buffer data isn't loaded yet, affect isn't applied
 	try{var frames = buffer.length;}
 	catch(e){
 		console.log("Warning, buffer data not loaded, accelerate effect not applied");
 		return
 	}
-	
+
 	var pcmData = new Float32Array(frames);
 	var newBuffer = this.ac.createBuffer(buffer.numberOfChannels, buffer.length, this.ac.sampleRate)
 	var newChannelData = new Float32Array(frames);
@@ -413,9 +428,9 @@ Graph.prototype.accel = function(buffer, accelerateValue, speed){
 			i++
 		}
 		newBuffer.copyToChannel(newChannelData,channel,0);
-		console.log(newChannelData)
+
 	}
-	this.source.buffer = newBuffer
+	return newBuffer;
 }
 
 
@@ -467,18 +482,15 @@ Graph.prototype.stop = function(time){
 	//setValueAtTime required so linearRampToValue doesn't start immediately
 	this.gain.gain.setValueAtTime(this.gain.gain.value, time)
 	this.gain.gain.linearRampToValueAtTime(0,time + 0.02);
-
-	//@More to disconnect/stop for garbage collection?
 }
 
 //Unit
 Graph.prototype.unit = function(unit, speed){
 	   //  a->accelerate = a->accelerate * a->speed * a->cps; // change rate by 1 per cycle
     // a->speed = sample->info->frames * a->speed * a->cps / samplerate;
-    console.log("playback rate: "+(this.source.playbackRate.value))
+
     if (unit == 'c')
-    	this.source.playbackRate.value = this.source.playbackRate.value*this.source.buffer.duration/cps;//this.source.buffer.length*speed*cps/this.ac.sampleRate+this.source.playbackRate.value;
-    
+    	this.source.playbackRate.value = this.source.playbackRate.value*this.source.buffer.duration/cps;
 }
 
 //Vowel effect
@@ -525,17 +537,17 @@ Graph.prototype.vowel= function (input, vowel){
 				input.connect(filterNode);
 				filterNode.connect(gain)
 				gain.connect(makeupGain)
-			
+
 			}
-			//@how much makeup gain to add? 
-			makeupGain.gain.value=3;
+			//@how much makeup gain to add?
+			makeupGain.gain.value=8;
 			return makeupGain;
 	}
 	else return input
 }
 
 
-vowelFormant = { 
+vowelFormant = {
 	a: {freqs:[660, 1120, 2750, 3000,3350],  amps: [1, 0.5012, 0.0708, 0.0631, 0.0126], qs:[80, 90, 120, 130, 140]},
 	e: {freqs:[440, 1800, 2700, 3000, 3300], amps: [1, 0.1995, 0.1259, 0.1, 0.1], qs: [70, 80, 100, 120, 120]},
 	i: {freqs:[270, 1850, 2900, 3350, 3590], amps: [1, 0.0631, 0.0631, 0.0158, 0.0158], qs:[40, 90, 100, 120, 120]},

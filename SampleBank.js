@@ -14,6 +14,7 @@ SampleBank = function(sampleMapUrl,urlPrefix,readyCallback) {
   request.responseType = "json";
   var closure = this;
   request.onload = function() {
+    console.log(request.status); // == 0 'unsent' or 'opened'
     if(request.readyState != 4) throw Error("readyState != 4 in callback of sampleMap load");
     if(request.status != 200) throw Error("status != 200 in callback of sampleMap load");
     if(request.response == null) throw Error("JSON response null in callback of sampleMap load");
@@ -21,6 +22,7 @@ SampleBank = function(sampleMapUrl,urlPrefix,readyCallback) {
     console.log("sampleMap loaded from " + closure.sampleMapUrl);
     if(typeof readyCallback == 'function')readyCallback();
   };
+  console.log("here")
   request.send();
 }
 
