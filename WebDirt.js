@@ -40,7 +40,12 @@ WebDirt.prototype.initializeWebAudio = function() {
     this.compressor.reduction.value = 0; //No gain reduction
     this.compressor.attack.value = 0.05;
     this.compressor.release.value = 0.1; //More slowly go back.
-    this.compressor.connect(this.ac.destination);
+
+    this.analyser = this.ac.createAnalyser();
+    this.compressor.connect(this.analyser);
+    this.analyser.connect(this.ac.destination);
+    this.soundMeter();
+
 
     //this.convolver = this.ac.createConvolver();
     //this.convolver.buffer = this.sampleBank.getBuffer("padlong", 0);
@@ -92,6 +97,47 @@ WebDirt.prototype.playSample = function(msg,latency) {
   var graph = new Graph(msg,this.ac,this.sampleBank,this.compressor,this.cutGroups);
 }
 
+WebDirt.prototype.soundMeter = function () {
+  console.log(this.analyser);
+  var scriptNode = this.ac.createScriptProcessor(2048, 1, 1);// @2?
+  this.analyser.connect(scriptNode);
+  this.analyser.smoothingTimeConstant = 0.9;
+  this.analyser.fftSize = 1024;
+
+  var canvas = document.getElementById('soundMeter'); // in your HTML this element appears as <canvas id="mycanvas"></canvas>
+  var ctx = canvas.getContext('2d');
+
+  var gradient = ctx.createLinearGradient(0,0,0,300);
+  gradient.addColorStop(1,'#000000');
+  gradient.addColorStop(0.75,'#ff0000');
+  gradient.addColorStop(0.25,'#ffff00');
+  gradient.addColorStop(0,'#ffffff');
+
+
+  var analyser = this.analyser
+  scriptNode.onaudioprocess = function() {
+
+      var array =  new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(array);
+      var average = getAverageVolume(array)
+      ctx.clearRect(0, 0, 60, 130);
+      ctx.fillStyle=gradient;
+      // create the meters
+      ctx.fillRect(0,130-average,25,130);
+  }
+
+    function getAverageVolume(array) {
+        var values = 0;
+        var average;
+        var length = array.length;
+        for (var i = 0; i < length; i++) {
+            values += array[i];
+        }
+        average = values / length;
+        return average;
+    }
+
+}
 
 WebDirt.prototype.playScore = function(score,latency,finishedCallback) {
   // where score is an array of message objects (each of which fulfills same expectations as the method 'playSample' above)
