@@ -115,8 +115,7 @@ Graph.prototype.disconnectOnEnd = function(x,y) {
 Graph.prototype.disconnectHandler = function() {
 	var closure = this;
 	return function() {
-		console.log("onend called")
-		try{console.log("end playback: " + closure.source.playbackRate.value)}catch(e){console.log(e)}
+		//try{console.log("end playback: " + closure.source.playbackRate.value)}catch(e){console.log(e)}
 		if(closure.disconnectQueue == null) return;
 		for(var i in closure.disconnectQueue) {
 			var x = closure.disconnectQueue[i];
