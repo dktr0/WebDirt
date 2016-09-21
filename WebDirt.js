@@ -25,10 +25,18 @@ WebDirt = function(sampleMapUrl,sampleFolder,latency,readyCallback,maxLateness) 
 // before any other potential calls to initializeWebAudio.
 
 WebDirt.prototype.initializeWebAudio = function() {
-  if(this.ac != null) return;
-  window.AudioContext = window.AudioContext || window.webkitAudioContext;
-  try {
-    this.ac = new AudioContext();
+  if(this.ac == null) {
+    try {
+      window.AudioContext = window.AudioContext || window.webkitAudioContext;
+      this.ac = new AudioContext();
+      console.log("WebDirt audio context created");
+    }
+    catch(e) {
+      console.log(e);
+      alert('Web Audio API is not supported in this browser');
+    }
+  }
+  if(this.ac != null) {
     this.tempo = {time:this.ac.currentTime,beats:0,bpm:30};
     this.clockDiff = Date.now()/1000 - this.ac.currentTime;
     this.sampleBank.ac = this.ac;
@@ -46,37 +54,29 @@ WebDirt.prototype.initializeWebAudio = function() {
     this.analyser.connect(this.ac.destination);
     this.soundMeter();
 
-
-    //this.convolver = this.ac.createConvolver();
-    //this.convolver.buffer = this.sampleBank.getBuffer("padlong", 0);
-
-    console.log("WebDirt audio context created");
+    this.silentNote = this.ac.createOscillator();
+    this.silentNote.type = 'sine';
+    this.silentNote.frequency.value = 440;
+    this.silentGain = this.ac.createGain();
+    this.silentGain.gain.value = 0;
+    this.silentNote.connect(this.silentGain);
+    this.silentGain.connect(this.ac.destination);
+    this.silentNote.start();
+    var closure = this;
+    setTimeout(function() {
+      closure.silentGain.disconnect(closure.ac.destination);
+      closure.silentNote.disconnect(closure.silentGain);
+      closure.silentNote.stop();
+      closure.silentGain = null;
+      closure.silentNote = null;
+    },500);
+    console.log("WebDirt global audio resources allocated");
   }
-  catch(e) {
-    console.log(e)
-    alert('Web Audio API is not supported in this browser');
-  }
-  this.silentNote = this.ac.createOscillator();
-  this.silentNote.type = 'sine';
-  this.silentNote.frequency.value = 440;
-  this.silentGain = this.ac.createGain();
-  this.silentGain.gain.value = 0;
-  this.silentNote.connect(this.silentGain);
-  this.silentGain.connect(this.ac.destination);
-  this.silentNote.start();
-  var closure = this;
-  setTimeout(function() {
-    closure.silentGain.disconnect(closure.ac.destination);
-    closure.silentNote.disconnect(closure.silentGain);
-    closure.silentNote.stop();
-    closure.silentGain = null;
-    closure.silentNote = null;
-  },500);
 }
 
 
 WebDirt.prototype.playSample = function(msg,latency) {
-  this.initializeWebAudio();
+  // this.initializeWebAudio();
   if(latency == null) latency = this.latency;
   if(msg.whenPosix != null) {
     // a little hack to allow sample times to be specified in POSIX epoch
