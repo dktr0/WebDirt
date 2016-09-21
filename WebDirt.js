@@ -312,7 +312,7 @@ WebDirt.prototype.syncWithEsp = function (url) {
   }
   if(this.espClient == null) {
     this.espClient = new EspClient(url,this.ac);
-    var closure;
+    var closure = this;
     this.espClient.tempoCallback = function (x) {
       closure.tempo = x;
     };
