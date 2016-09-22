@@ -30,6 +30,9 @@ WebDirt.prototype.initializeWebAudio = function() {
       window.AudioContext = window.AudioContext || window.webkitAudioContext;
       this.ac = new AudioContext();
       console.log("WebDirt audio context created");
+      this.tempo = {time:this.ac.currentTime,beats:0,bpm:30};
+      this.clockDiff = Date.now()/1000 - this.ac.currentTime;
+      this.sampleBank.ac = this.ac;
     }
     catch(e) {
       console.log(e);
@@ -37,10 +40,7 @@ WebDirt.prototype.initializeWebAudio = function() {
     }
   }
   if(this.ac != null) {
-    this.tempo = {time:this.ac.currentTime,beats:0,bpm:30};
-    this.clockDiff = Date.now()/1000 - this.ac.currentTime;
-    this.sampleBank.ac = this.ac;
-
+ 
     this.compressor = this.ac.createDynamicsCompressor();
     this.compressor.threshold.value= 20; //value taken in decibels
     this.compressor.knee.value = 10; //Low/hard knee
@@ -52,7 +52,7 @@ WebDirt.prototype.initializeWebAudio = function() {
     this.analyser = this.ac.createAnalyser();
     this.compressor.connect(this.analyser);
     this.analyser.connect(this.ac.destination);
-    this.soundMeter();
+    // this.soundMeter();
 
     this.silentNote = this.ac.createOscillator();
     this.silentNote.type = 'sine';
