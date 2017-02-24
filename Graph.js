@@ -461,8 +461,8 @@ Graph.prototype.shape = function (input, shape){
 
 	if(shape!=0) {
 		//Distortion limited to [0,1]
-		if (Math.abs(shape)>1) shape=1;
-		else shape=Math.abs(shape);
+		if (shape<0) shape = Math.abs(shape);
+		if (Math.abs(shape)>=1) shape=0.999;
 		var distortionNode = this.ac.createWaveShaper();
 
 		//@Change makeDistortion Curve?
