@@ -40,7 +40,7 @@ WebDirt.prototype.initializeWebAudio = function() {
     }
   }
   if(this.ac != null) {
- 
+
     this.compressor = this.ac.createDynamicsCompressor();
     this.compressor.threshold.value= 20; //value taken in decibels
     this.compressor.knee.value = 10; //Low/hard knee
@@ -328,4 +328,12 @@ WebDirt.prototype.setTempo = function(x) {
   if(typeof x.bpm != 'number') throw Error("WebDirt: no bpm in setTempo");
   if(this.espClient != null) this.espClient.sendSetTempo(x);
   this.tempo = x;
+}
+
+WebDirt.prototype.hint1 = function(x,y) {
+  console.log("WebDirt received 1 argument hint: " + x);
+}
+
+WebDirt.prototype.hint2 = function(x,y) {
+  console.log("WebDirt received 2 argument hint: " + x + " " + y);
 }
