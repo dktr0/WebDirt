@@ -330,10 +330,7 @@ WebDirt.prototype.setTempo = function(x) {
   this.tempo = x;
 }
 
-WebDirt.prototype.hint1 = function(x,y) {
-  console.log("WebDirt received 1 argument hint: " + x);
-}
-
-WebDirt.prototype.hint2 = function(x,y) {
-  console.log("WebDirt received 2 argument hint: " + x + " " + y);
+WebDirt.prototype.sampleHint = function(x) {
+  console.log("WebDirt received sample hint: " + x);
+  this.sampleBank.loadAllNamed(x);
 }
