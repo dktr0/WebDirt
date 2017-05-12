@@ -30,8 +30,9 @@ SampleBank = function(sampleMapUrl,urlPrefix,readyCallback) {
 SampleBank.prototype.loadAllNamed = function(name) {
   if(this.ac == null) throw Error("called SampleBank.loadAllNamed with null audio context");
   if(this.sampleMap == null) throw Error("SampleBank.loadAllNamed: sampleMap is null");
-  if(this.sampleMap[name] == null) throw Error("SampleBank.loadAllNamed: no sampleMap for " + name);
-  for(var n=0;n<this.sampleMap[name].length;n++) this.load(name,n);
+  if(this.sampleMap[name] != null) {
+    for(var n=0;n<this.sampleMap[name].length;n++) this.load(name,n);
+  }
 }
 
 // loads an individual sample
@@ -39,8 +40,7 @@ SampleBank.prototype.load = function(name,number,callbackWhenReady) {
   if(this.ac == null) throw Error("called SampleBank.load with null audio context");
   if(number == null) number = 0;
   if(this.sampleMap == null) throw Error("SampleBank.load: sampleMap is null");
-  if(this.sampleMap[name] == null) throw Error("SampleBank.load: no sampleMap for " + name);
-  if(number >= this.sampleMap[name].length) throw Error("SampleBank.load: number > number of samples");
+  if(this.sampleMap[name] == null || number >= this.sampleMap[name].length) return;
   var filename = this.sampleMap[name][number];
   if(this.samples[filename] != null) {
     if(this.samples[filename].status == 'ready') {
@@ -63,7 +63,7 @@ SampleBank.prototype.load = function(name,number,callbackWhenReady) {
     var closure = this; // a closure is necessary for...
     request.onload = function() {
       closure.ac.decodeAudioData(request.response, function(x) {
-        console.log("sample " + url + "loaded");
+        // console.log("sample " + url + "loaded");
         closure.samples[filename].buffer = x; // ...the decoded data to be kept in the object
         closure.samples[filename].status = 'ready';
         if(typeof callbackWhenReady == 'function') callbackWhenReady();
@@ -84,13 +84,13 @@ SampleBank.prototype.getBuffer = function(name,number) {
   if(this.ac == null) throw Error("called SampleBank.getBuffer with null audio context");
   if(number == null) number = 0;
   if(this.sampleMap == null) throw Error("SampleBank.getBuffer: sampleMap is null");
-  if(this.sampleMap[name] == null) throw Error("SampleBank.getBuffer: no sampleMap for " + name);
+  if(this.sampleMap[name] == null) return;
   number = number % this.sampleMap[name].length;
 
   var filename = this.sampleMap[name][number];
   if(this.samples[filename] == null) {
     this.load(name,number);
-    console.log("loading sample " + filename + "for the first time");
+    console.log("loading " + filename + "for the first time");
     return null;
   }
   if(this.samples[filename].status == 'error') {
