@@ -76,14 +76,14 @@ function Graph(msg,ac,sampleBank,compressor, cutGroups){
 
 
 	//Gain
-	if(isNaN(parseInt(msg.gain))) msg.gain = 1;
+	if(isNaN(parseFloat(msg.gain))) msg.gain = 1;
 	this.gain = ac.createGain();
 	this.gain.gain.value = Math.abs(Math.pow(msg.gain,4));
 	last.connect(this.gain);
 	var last = this.gain;
 
 	//Panning (currently stereo)
-	if(isNaN(parseInt(msg.pan))) msg.pan = 0.5;
+	if(isNaN(parseFloat(msg.pan))) msg.pan = 0.5;
 	var gain1 = ac.createGain();
 	var gain2 = ac.createGain();
 
@@ -104,6 +104,19 @@ function Graph(msg,ac,sampleBank,compressor, cutGroups){
 Graph.prototype.start = function() {
 	this.source.onended = this.disconnectHandler();
 	this.source.start(this.when,this.begin*this.source.buffer.duration,this.end*this.source.buffer.duration);
+}
+
+Graph.prototype.stopAll = function() {
+	if(this.disconnectQueue != null) {
+		for(var i in this.disconnectQueue) {
+			var x = this.disconnectQueue[i];
+			if(x.input == null) throw Error("first of pair of things to disconnect must exist");
+			if(x.output == null) x.input.disconnect();
+			else x.input.disconnect(x.output);
+		}
+	}
+	this.source.disconnect();
+	this.source = null;
 }
 
 Graph.prototype.disconnectOnEnd = function(x,y) {
