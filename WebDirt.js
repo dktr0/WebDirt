@@ -31,7 +31,7 @@ WebDirt.prototype.initializeWebAudio = function() {
       this.ac = new AudioContext();
       console.log("WebDirt audio context created");
       this.tempo = {time:this.ac.currentTime,beats:0,bpm:30};
-      this.clockDiff = Date.now()/1000 - this.ac.currentTime;
+      this.clockDiff = this.ac.currentTime - (Date.now()/1000);
       this.sampleBank.ac = this.ac;
     }
     catch(e) {
@@ -270,8 +270,7 @@ WebDirt.prototype.subscribeToTidalSocket = function(url,withLog) {
     else if(msg.args.length != 30 && msg.args.length != 33) throw Error("ERROR: message from tidalSocket with " + msg.args.length + " args instead of 30 or 33: " + m.data);
     else {
       var x = {};
-      // var diff = Date.now()/1000 - closure.ac.currentTime;
-      x.when = msg.args[0] + (msg.args[1]/1000000) - closure.clockDiff;
+      x.when = msg.args[0] + (msg.args[1]/1000000) + closure.clockDiff;
       x.sample_name = msg.args[3];
       //4 not used.
       x.begin = msg.args[5];
