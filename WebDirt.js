@@ -49,6 +49,35 @@ WebDirt.prototype.initializeWebAudio = function() {
     this.compressor.attack.value = 0.05;
     this.compressor.release.value = 0.1; //More slowly go back.
 
+    this.levelMeter = this.ac.createScriptProcessor(1024,2,0);
+    var levelMeterClosure = this.levelMeter;
+    this.levelMeter.onaudioprocess = function (e) {
+      var leftIn = e.inputBuffer.getChannelData(0);
+      var rightIn = e.inputBuffer.getChannelData(1);
+      var leftPeak = 0;
+      var rightPeak = 0;
+      var leftRms = 0;
+      var rightRms = 0;
+      var left, right;
+      for(var x=0;x<leftIn.length;x++) {
+        left = leftIn[x];
+        right = rightIn[x];
+        if(Math.abs(left) > leftPeak) leftPeak = left;
+        if(Math.abs(right) > rightPeak) rightPeak = right;
+        leftRms = leftRms + (left*left);
+        rightRms = rightRms + (right*right);
+      }
+      leftRms = Math.sqrt(leftRms/leftIn.length);
+      rightRms = Math.sqrt(rightRms/rightIn.length);
+      leftPeak = 20 * Math.log10(leftPeak);
+      rightPeak = 20 * Math.log10(rightPeak);
+      leftRms = 20 * Math.log10(leftRms);
+      rightRms = 20 * Math.log10(rightRms);
+      levelMeterClosure.peak = [leftPeak,rightPeak];
+      levelMeterClosure.rms = [leftRms,rightRms];
+    };
+    this.compressor.connect(this.levelMeter);
+
     this.analyser = this.ac.createAnalyser();
     this.compressor.connect(this.analyser);
     this.analyser.connect(this.ac.destination);
