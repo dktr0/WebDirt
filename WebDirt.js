@@ -11,7 +11,6 @@ WebDirt = function(sampleMapUrl,sampleFolder,latency,readyCallback,maxLateness) 
   this.sampleFolder = sampleFolder;
   this.sampleBank = new SampleBank(this.sampleMapUrl,this.sampleFolder,readyCallback);
   this.cutGroups = new Array;
-  this.playing = new Array;
 }
 
 // note: the constructor above does not initialize the Web Audio context.
@@ -31,7 +30,7 @@ WebDirt.prototype.initializeWebAudio = function() {
       this.ac = new AudioContext();
       console.log("WebDirt audio context created");
       this.tempo = {time:this.ac.currentTime,beats:0,bpm:30};
-      this.clockDiff = this.ac.currentTime - (Date.now()/1000);
+      this.clockDiff = (Date.now() / 1000) - this.ac.currentTime;
       this.sampleBank.ac = this.ac;
     }
     catch(e) {
@@ -123,9 +122,7 @@ WebDirt.prototype.playSample = function(msg,latency) {
     return;
   }
 
-  var graph = new Graph(msg,this.ac,this.sampleBank,this.compressor,this.cutGroups);
-  this.playing.push(graph);
-  return graph;
+  return new Graph(msg,this.ac,this.sampleBank,this.compressor,this.cutGroups);
 }
 
 WebDirt.prototype.soundMeter = function () {
@@ -193,15 +190,6 @@ WebDirt.prototype.playScore = function(score,latency,finishedCallback) {
       finishedCallback();
     }
   },(latestOnset+latency)*1000);
-}
-
-WebDirt.prototype.stopAll = function () {
-  for(var x in this.playing) {
-    if(this.playing[x] != null) {
-      this.playing[x].stopAll();
-    }
-  }
-  this.playing = new Array;
 }
 
 WebDirt.prototype.playScoreWhenReady = function(score,latency,readyCallback,finishedCallback) {
