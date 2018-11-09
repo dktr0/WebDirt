@@ -15,6 +15,9 @@ function Graph(msg,ac,sampleBank,compressor, cutGroups){
 	var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
 
 	if(isNaN(parseInt(msg.speed))) msg.speed = 1;
+	if(isNaN(parseInt(msg.note))) msg.note = 0;
+	msg.speed = msg.speed * Math.pow(2,msg.note/12);
+	
 	//^if(msg.speed>=0 && buffer != null) this.source.buffer = buffer;
 	if(msg.speed<0 && buffer != null)  buffer =this.reverseBuffer(buffer) //^
 	msg.speed = Math.abs(msg.speed)
