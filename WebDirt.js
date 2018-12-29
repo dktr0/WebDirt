@@ -1,4 +1,4 @@
-WebDirt = function(sampleMapUrl,sampleFolder,latency,readyCallback,maxLateness) {
+WebDirt = function(sampleMapUrl,sampleFolder,latency,readyCallback,maxLateness,audioContext) {
   if(sampleMapUrl == null) sampleMapUrl = "sampleMap.json";
   if(sampleFolder == null) sampleFolder = "samples";
   if(latency == null) latency = 0.4;
@@ -6,11 +6,16 @@ WebDirt = function(sampleMapUrl,sampleFolder,latency,readyCallback,maxLateness) 
   if(typeof maxLateness != 'number') {
     this.maxLateness = 0.005;
   } else this.maxLateness = maxLateness;
-  console.log("WebDirt maximum lateness = " + this.maxLateness);
   this.sampleMapUrl = sampleMapUrl;
   this.sampleFolder = sampleFolder;
   this.sampleBank = new SampleBank(this.sampleMapUrl,this.sampleFolder,readyCallback);
   this.cutGroups = new Array;
+  this.ac = audioContext;
+  if(this.ac == null) {
+    console.log("WebDirt initialized (without audio context yet)");
+  } else {
+    console.log("WebDirt initialized with audio context");
+  }
 }
 
 // note: the constructor above does not initialize the Web Audio context.
@@ -29,17 +34,17 @@ WebDirt.prototype.initializeWebAudio = function() {
       window.AudioContext = window.AudioContext || window.webkitAudioContext;
       this.ac = new AudioContext();
       console.log("WebDirt audio context created");
-      this.tempo = {time:this.ac.currentTime,beats:0,bpm:30};
-      this.clockDiff = (Date.now() / 1000) - this.ac.currentTime;
-      this.sampleBank.ac = this.ac;
     }
     catch(e) {
       console.log(e);
       alert('Web Audio API is not supported in this browser');
+      return;
     }
   }
   if(this.ac != null) {
-
+    this.tempo = {time:this.ac.currentTime,beats:0,bpm:30};
+    this.clockDiff = (Date.now() / 1000) - this.ac.currentTime;
+    this.sampleBank.ac = this.ac;
     this.compressor = this.ac.createDynamicsCompressor();
     this.compressor.threshold.value= 20; //value taken in decibels
     this.compressor.knee.value = 10; //Low/hard knee

@@ -22,7 +22,6 @@ SampleBank = function(sampleMapUrl,urlPrefix,readyCallback) {
     console.log("sampleMap loaded from " + closure.sampleMapUrl);
     if(typeof readyCallback == 'function')readyCallback();
   };
-  console.log("here")
   request.send();
 }
 
