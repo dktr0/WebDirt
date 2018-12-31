@@ -52,15 +52,14 @@ WebDirt.prototype.initializeWebAudio = function() {
     this.tempo = {time:this.ac.currentTime,beats:0,bpm:30};
     this.clockDiff = (Date.now() / 1000) - this.ac.currentTime;
     this.sampleBank.ac = this.ac;
-    this.compressor = this.ac.createDynamicsCompressor();
+/*    this.compressor = this.ac.createDynamicsCompressor();
     this.compressor.threshold.value= 20; //value taken in decibels
     this.compressor.knee.value = 10; //Low/hard knee
     this.compressor.ratio.value = 4;
-    this.compressor.reduction.value = 0; //No gain reduction
     this.compressor.attack.value = 0.05;
-    this.compressor.release.value = 0.1; //More slowly go back.
+    this.compressor.release.value = 0.1; //More slowly go back. */
 
-    this.levelMeter = this.ac.createScriptProcessor(1024,2,0);
+/*    this.levelMeter = this.ac.createScriptProcessor(1024,2,0);
     var levelMeterClosure = this.levelMeter;
     this.levelMeter.onaudioprocess = function (e) {
       var leftIn = e.inputBuffer.getChannelData(0);
@@ -86,12 +85,12 @@ WebDirt.prototype.initializeWebAudio = function() {
       rightRms = 20 * Math.log10(rightRms);
       levelMeterClosure.peak = [leftPeak,rightPeak];
       levelMeterClosure.rms = [leftRms,rightRms];
-    };
-    this.compressor.connect(this.levelMeter);
+    }; */
+    // this.compressor.connect(this.levelMeter);
 
-    this.analyser = this.ac.createAnalyser();
-    this.compressor.connect(this.analyser);
-    this.analyser.connect(this.destination);
+    // this.analyser = this.ac.createAnalyser();
+    // this.compressor.connect(this.analyser);
+    // this.analyser.connect(this.destination);
     // this.soundMeter();
 
     this.silentNote = this.ac.createOscillator();
@@ -100,11 +99,11 @@ WebDirt.prototype.initializeWebAudio = function() {
     this.silentGain = this.ac.createGain();
     this.silentGain.gain.value = 0;
     this.silentNote.connect(this.silentGain);
-    this.silentGain.connect(this.destination);
+    this.silentGain.connect(this.ac.destination);
     this.silentNote.start();
     var closure = this;
     setTimeout(function() {
-      closure.silentGain.disconnect(closure.destination);
+      closure.silentGain.disconnect(closure.ac.destination);
       closure.silentNote.disconnect(closure.silentGain);
       closure.silentNote.stop();
       closure.silentGain = null;
@@ -134,7 +133,7 @@ WebDirt.prototype.playSample = function(msg,latency) {
     return;
   }
 
-  return new Graph(msg,this.ac,this.sampleBank,this.compressor,this.cutGroups);
+  return new Graph(msg,this.ac,this.sampleBank,this.destination,this.cutGroups);
 }
 
 WebDirt.prototype.soundMeter = function () {
