@@ -1,4 +1,4 @@
-WebDirt = function(sampleMapUrl,sampleFolder,latency,readyCallback,maxLateness,audioContext) {
+WebDirt = function(sampleMapUrl,sampleFolder,latency,readyCallback,maxLateness,audioContext,destination) {
   if(sampleMapUrl == null) sampleMapUrl = "sampleMap.json";
   if(sampleFolder == null) sampleFolder = "samples";
   if(latency == null) latency = 0.4;
@@ -11,10 +11,16 @@ WebDirt = function(sampleMapUrl,sampleFolder,latency,readyCallback,maxLateness,a
   this.sampleBank = new SampleBank(this.sampleMapUrl,this.sampleFolder,readyCallback);
   this.cutGroups = new Array;
   this.ac = audioContext;
+  this.destination = destination;
   if(this.ac == null) {
     console.log("WebDirt initialized (without audio context yet)");
   } else {
-    console.log("WebDirt initialized with audio context");
+    if(this.destination == null) {
+      this.destination = this.ac.destination;
+      console.log("WebDirt initialized with provided audio context and audio context destination");
+    } else {
+      console.log("WebDirt initialized with provided audio context and provided destination")
+    }
   }
 }
 
@@ -33,6 +39,7 @@ WebDirt.prototype.initializeWebAudio = function() {
     try {
       window.AudioContext = window.AudioContext || window.webkitAudioContext;
       this.ac = new AudioContext();
+      this.destination = this.ac.destination;
       console.log("WebDirt audio context created");
     }
     catch(e) {
@@ -84,7 +91,7 @@ WebDirt.prototype.initializeWebAudio = function() {
 
     this.analyser = this.ac.createAnalyser();
     this.compressor.connect(this.analyser);
-    this.analyser.connect(this.ac.destination);
+    this.analyser.connect(this.destination);
     // this.soundMeter();
 
     this.silentNote = this.ac.createOscillator();
@@ -93,11 +100,11 @@ WebDirt.prototype.initializeWebAudio = function() {
     this.silentGain = this.ac.createGain();
     this.silentGain.gain.value = 0;
     this.silentNote.connect(this.silentGain);
-    this.silentGain.connect(this.ac.destination);
+    this.silentGain.connect(this.destination);
     this.silentNote.start();
     var closure = this;
     setTimeout(function() {
-      closure.silentGain.disconnect(closure.ac.destination);
+      closure.silentGain.disconnect(closure.destination);
       closure.silentNote.disconnect(closure.silentGain);
       closure.silentNote.stop();
       closure.silentGain = null;
