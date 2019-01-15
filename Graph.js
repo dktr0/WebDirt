@@ -52,7 +52,7 @@ function Graph(msg,ac,sampleBank,compressor, cutGroups){
 	//Cut
 	this.cut(msg.cut, msg.sample_name);
 	// Distortion
-	last = this.shape(last, msg.shape);
+	// last = this.shape(last, msg.shape); -- removed because of performance issues
 	//Lowpass filtering @what level/function to set frequency and resonant gain at?
 	last = this.lowPassFilter(last, msg.cutoff, msg.resonance);
 	//higpass filtering @what level/function to set frequency and resonant gain at?
