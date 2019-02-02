@@ -49,6 +49,9 @@ WebDirt.prototype.initializeWebAudio = function() {
     }
   }
   if(this.ac != null) {
+    this.ac.audioWorklet.addModule('WebDirt/AudioWorklets.js').then( () => { // *** WARNING: path is not robust to different installation patterns here
+      console.log("WebDirt audio worklets added");
+    });
     this.tempo = {time:this.ac.currentTime,beats:0,bpm:30};
     this.clockDiff = (Date.now() / 1000) - this.ac.currentTime;
     this.sampleBank.ac = this.ac;

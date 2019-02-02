@@ -161,36 +161,20 @@ Graph.prototype.bandPassFilter=function(input, bandf, bandq){
 	else return input;
 }
 
-
-//Coarse Effect
 Graph.prototype.coarse = function(input, coarse){
-	//Safety and msg parsing
-	if(isNaN(parseInt(coarse))) coarse = 1;
-	coarse=Math.abs(coarse);
-	if(coarse>1){
-		var	scriptNode = this.ac.createScriptProcessor();
-
-		scriptNode.onaudioprocess = function(audioProcessingEvent){
-			var inputBuffer = audioProcessingEvent.inputBuffer;
-			var outputBuffer = audioProcessingEvent.outputBuffer;
-			for (var channel=0;channel<outputBuffer.numberOfChannels; channel++){
-				var inputData = inputBuffer.getChannelData(channel);
-				var outputData = outputBuffer.getChannelData(channel);
-				for(var frame=0; frame<inputBuffer.length; frame++){
-					if(frame%coarse==0) outputData[frame]=inputData[frame];
-					else outputData[frame]=outputData[frame-1];
-				}//Frames
-			}//Channels
-		}//end scriptNode audio processing handler
-
-		input.connect(scriptNode);
-		this.disconnectOnEnd(input,scriptNode);
-		this.disconnectOnEnd(scriptNode);
-		return scriptNode;
-	}
-	else
-		return input
+  if(isNaN(parseInt(coarse))) coarse = 1;
+  if(coarse > 1) {
+    var coarseProcessorNode = new AudioWorkletNode(this.ac,'coarse-processor');
+    coarseProcessorNode.parameters.get('coarse').value = coarse;
+    input.connect(coarseProcessorNode);
+    this.disconnectOnEnd(input,coarseProcessorNode);
+    this.disconnectOnEnd(coarseProcessorNode);
+    return coarseProcessorNode;
+  } else {
+    return input;
+  }
 }
+
 
 //Crush
 Graph.prototype.crush = function(input, crush){
