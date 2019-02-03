@@ -52,7 +52,7 @@ function Graph(msg,ac,sampleBank,compressor, cutGroups){
 	//Cut
 	this.cut(msg.cut, msg.sample_name);
 	// Distortion
-	// last = this.shape(last, msg.shape); -- removed because of performance issues
+	last = this.shape(last, msg.shape);
 	//Lowpass filtering @what level/function to set frequency and resonant gain at?
 	last = this.lowPassFilter(last, msg.cutoff, msg.resonance);
 	//higpass filtering @what level/function to set frequency and resonant gain at?
@@ -162,11 +162,12 @@ Graph.prototype.bandPassFilter=function(input, bandf, bandq){
 }
 
 Graph.prototype.coarse = function(input, coarse){
-  if(isNaN(parseInt(coarse))) coarse = 1;
+  coarse = parseInt(coarse);
+  if(isNaN(coarse)) coarse = 1;
   if(coarse > 1) {
     var coarseProcessorNode = new AudioWorkletNode(this.ac,'coarse-processor');
     coarseProcessorNode.parameters.get('coarse').value = coarse;
-    input.connect(coarseProcessorNode);
+    input.connect(coarseProcessorNode); 
     this.disconnectOnEnd(input,coarseProcessorNode);
     this.disconnectOnEnd(coarseProcessorNode);
     return coarseProcessorNode;
@@ -175,35 +176,20 @@ Graph.prototype.coarse = function(input, coarse){
   }
 }
 
-
-//Crush
 Graph.prototype.crush = function(input, crush){
-
-	if(isNaN(parseInt(crush))) crush = null;
-	if(crush!=null && crush>0){
-
-	var scriptNode = this.ac.createScriptProcessor();
-		//scriptNode Processing Handler
-		scriptNode.onaudioprocess = function(audioProcessingEvent){
-			var inputBuffer = audioProcessingEvent.inputBuffer;
-			var outputBuffer = audioProcessingEvent.outputBuffer;
-			for (var channel=0;channel<outputBuffer.numberOfChannels; channel++){
-				var inputData = inputBuffer.getChannelData(channel);
-				var outputData = outputBuffer.getChannelData(channel);
-				for(var frame=0; frame<inputBuffer.length; frame++){
-					outputData[frame]=Math.round(inputData[frame]*Math.pow(2,(crush-1)))/Math.pow(2,(crush-1));
-				}//Frames
-			}//Channels
-		}//end scriptNode audio processing handler
-
-		input.connect(scriptNode);
-		this.disconnectOnEnd(input,scriptNode);
-		this.disconnectOnEnd(scriptNode);
-	return scriptNode;
-	}
-	else
-		return input
-}//End Crush
+  crush = parseInt(crush);
+  if(isNaN(crush)) crush = null;
+  if(crush!=null && crush>0) {
+    var crushProcessorNode = new AudioWorkletNode(this.ac,'crush-processor');
+    crushProcessorNode.parameters.get('crush').value = crush;
+    input.connect(crushProcessorNode);
+    this.disconnectOnEnd(input,crushProcessorNode);
+    this.disconnectOnEnd(crushProcessorNode);
+    return crushProcessorNode;
+  } else {
+    return input;
+  }
+}
 
 //Cut
 Graph.prototype.cut = function(cut, sample_name){
@@ -333,17 +319,6 @@ Graph.prototype.lowPassFilter = function(input, cutoff, resonance){
 
 }
 
-//@Refine/differentiate?
-function makeDistortionCurve(amount){
-	var curve = new Float32Array(44100);
-	var k = 10*amount/(1-amount);
-	for(var i=0; i<44100;i++){
-        var x = (i) * (2) / (44100)-1;
-        curve[i] = (1 + k) * x / (1+k * Math.abs(x));
-	}
-return curve;
-}
-
 
 //Accelerate @negative values aren't quite right
 Graph.prototype.accelerate = function(accelerateValue, speed){
@@ -456,26 +431,21 @@ Graph.prototype.reverseBuffer= function(buffer){
 	return newBuffer;
 }
 
-Graph.prototype.shape = function (input, shape){
-	if (isNaN(parseInt(shape)))return input;
-
-	if(shape!=0) {
-		//Distortion limited to [0,1]
-		if (shape<0) shape = Math.abs(shape);
-		if (Math.abs(shape)>=1) shape=0.999;
-		var distortionNode = this.ac.createWaveShaper();
-
-		//@Change makeDistortion Curve?
-		distortionNode.curve = makeDistortionCurve(shape);
-		distortionNode.oversample = '2x';
-
-		//Connect Distortion to last, and pass on 'last'
-		input.connect(distortionNode);
-		return distortionNode;
-	}
-	else
-		return input;
+Graph.prototype.shape = function(input, shape){
+  shape = parseFloat(shape);
+  if(isNaN(shape)) shape = 0;
+  if(shape>0) {
+    var shapeProcessorNode = new AudioWorkletNode(this.ac,'shape-processor');
+    shapeProcessorNode.parameters.get('shape').value = shape;
+    input.connect(shapeProcessorNode);
+    this.disconnectOnEnd(input,shapeProcessorNode);
+    this.disconnectOnEnd(shapeProcessorNode);
+    return shapeProcessorNode;
+  } else {
+    return input;
+  }
 }
+
 
 Graph.prototype.stop = function(time){
 	//setValueAtTime required so linearRampToValue doesn't start immediately
@@ -554,97 +524,3 @@ vowelFormant = {
 	u: {freqs:[370, 630, 2750, 3000, 3400], amps: [ 1, 0.1, 0.0708, 0.0316, 0.01995], qs: [40, 60, 100, 120, 120]}
 }
 
-
-/* Some older functions for effects, may want to refer back to them eventually
-//Returns a new BufferSourceNode containing a buffer with the reversed frames of the
-//parameter 'buffer'
-//@add add more for multi-channel samples
-Graph.prototype.reverseBuffer= function(buffer){
-	var frames = buffer.length;
-	var pcmData = new Float32Array(frames);
-	var newBuffer = ac.createBuffer(buffer.numberOfChannels,buffer.length,ac.sampleRate);
-	// var source = ac.createBufferSource();
-	var newChannelData = new Float32Array(frames);
-
-	buffer.copyFromChannel(pcmData,0,0);
-	for (var i =0;i<frames;i++){
-		newChannelData[i]=pcmData[frames-i];
-	}
-	//First element of newChannelData will be set to NaN - causes clipping on first frame
-	//set to send element to get rid of clipping
-	newChannelData[0]=newChannelData[1];
-	newBuffer.copyToChannel(newChannelData,0,0);
-
-	return newBuffer;
-
-//	source.buffer = newBuffer;
-//	return source;
-}
-
-//Returns BufferSourceNode with a sped up buffer. Volume of samples given a high speed parameter (>~4) is
-//better preserved using this function rather than simply altering the playbackRate of the buffer.
-function speed(buffer,rate){
-	var frames = buffer.length;
-	var pcmData = new Float32Array(frames);
-	var newBuffer = this.ac.createBuffer(buffer.numberOfChannels,Math.trunc(buffer.length/rate),ac.sampleRate);
-	var newsource = this.ac.createBufferSource();
-	var newChannelData = new Float32Array(newBuffer.length);
-	buffer.copyFromChannel(pcmData,0,0);
-
-	for(var i=0; i<newBuffer.length; i++){
-		newChannelData[i]=pcmData[i*rate];
-	}
-
-
-	newBuffer.copyToChannel(newChannelData,0,0);
-	newsource.buffer = newBuffer;
-	return newsource;
-
-}
-
-//Used for coarse effect
-function decimate(buffer,rate,ac){
-	var frames = buffer.length;
-	var pcmData = new Float32Array(frames);
-	var newBuffer = ac.createBuffer(buffer.numberOfChannels,buffer.length,ac.sampleRate);
-	var newsource = ac.createBufferSource();
-	var newChannelData = new Float32Array(newBuffer.length);
-	buffer.copyFromChannel(pcmData,0,0);
-
-	for(var i=0; i<newBuffer.length; i++){
-		if(i%rate==0){
-		newChannelData[i]=pcmData[i];
-		}
-		else{
-		newChannelData[i]=newChannelData[i-1];
-		}
-
-	}
-	newBuffer.copyToChannel(newChannelData,0,0);
-	newsource.buffer = newBuffer;
-	return newsource;
- }
-
-// returns a buffer source with a buffer with bit resolution degraded
-// by 'crush'
-function crush(buffer, crush, ac){
-	var frames = buffer.length;
-	var pcmData = new Float32Array(frames);
-	var newBuffer = ac.createBuffer(buffer.numberOfChannels,buffer.length,ac.sampleRate);
-	var source = ac.createBufferSource();
-	var newChannelData = new Float32Array(frames);
-	buffer.copyFromChannel(pcmData,0,0);
-
-	for (var i =0;i<frames;i++){
-		newChannelData[i]=Math.round(pcmData[i]*Math.pow(2,(crush-1)))/Math.pow(2,(crush-1));
-	}
-	console.log(newChannelData)
-	newBuffer.copyToChannel(newChannelData,0,0);
-	source.buffer = newBuffer;
-
-	return source;
-}
-
-
-
-*/
