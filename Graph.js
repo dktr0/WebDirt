@@ -1,5 +1,5 @@
 var cps = 1;
-function Graph(msg,ac,sampleBank,compressor, cutGroups){
+function Graph(msg,ac,sampleBank,outputNode, cutGroups){
 	this.cutGroups=cutGroups
 	this.ac = ac;
 	var last,temp;
@@ -7,6 +7,7 @@ function Graph(msg,ac,sampleBank,compressor, cutGroups){
 
 	// get basic buffer player, including speed change and sample reversal
 	this.source = last = ac.createBufferSource();
+	this.disconnectOnEnd(this.source);
 	if(isNaN(parseInt(msg.begin))) msg.begin = 0;
 	if(isNaN(parseInt(msg.end))) msg.end = 1;
 	this.begin = msg.begin;
@@ -44,7 +45,10 @@ function Graph(msg,ac,sampleBank,compressor, cutGroups){
 				closure.source.buffer = buffer;
 				closure.start();
 			}
-			else console.log("unable to access sample " + msg.sample_name + ":" + msg.sample_n + " on second attempt");
+			else {
+				console.log("WebDirt: unable to access sample " + msg.sample_name + ":" + msg.sample_n + " on second attempt");
+				closure.stopAll();
+			}
 		},reattemptDelay);
 	}
 
@@ -70,17 +74,12 @@ function Graph(msg,ac,sampleBank,compressor, cutGroups){
 	//Coarse
 	last = this.coarse(last, msg.coarse);
 
-	this.unit(msg.unit,msg.speed)
-
-
-  //this.ac.createBuffer(buffer.numberOfChannels, buffer.length, this.ac.sampleRate);
-
-
-
+	this.unit(msg.unit,msg.speed);
 
 	//Gain
 	if(isNaN(parseFloat(msg.gain))) msg.gain = 1;
 	this.gain = ac.createGain();
+	this.disconnectOnEnd(this.gain);
 	this.gain.gain.value = Math.abs(Math.pow(msg.gain,4));
 	last.connect(this.gain);
 	var last = this.gain;
@@ -88,7 +87,9 @@ function Graph(msg,ac,sampleBank,compressor, cutGroups){
 	//Panning (currently stereo)
 	if(isNaN(parseFloat(msg.pan))) msg.pan = 0.5;
 	var gain1 = ac.createGain();
+	this.disconnectOnEnd(gain1);
 	var gain2 = ac.createGain();
+	this.disconnectOnEnd(gain2);
 
 	//Equal power panning @
 	gain1.gain.value = Math.cos(msg.pan*Math.PI/2);
@@ -97,12 +98,17 @@ function Graph(msg,ac,sampleBank,compressor, cutGroups){
 	last.connect(gain1);
 	last.connect(gain2);
 	var channelMerger = ac.createChannelMerger(2);
+	this.disconnectOnEnd(channelMerger);
 	gain1.connect(channelMerger,0,0);
 	gain2.connect(channelMerger,0,1);
-	channelMerger.connect(compressor);
+	channelMerger.connect(outputNode);
 
 }// End Graph
 
+Graph.prototype.disconnectOnEnd = function(x) {
+	if(this.source.disconnectQueue == null) this.source.disconnectQueue = new Array;
+	this.source.disconnectQueue.unshift(x);
+}
 
 Graph.prototype.start = function() {
 	this.source.onended = this.disconnectHandler();
@@ -110,35 +116,21 @@ Graph.prototype.start = function() {
 }
 
 Graph.prototype.stopAll = function() {
-	if(this.disconnectQueue != null) {
-		for(var i in this.disconnectQueue) {
-			var x = this.disconnectQueue[i];
-			if(x.input == null) throw Error("first of pair of things to disconnect must exist");
-			if(x.output == null) x.input.disconnect();
-			else x.input.disconnect(x.output);
+	if(this.source.disconnectQueue != null) {
+		for(var i in this.source.disconnectQueue) {
+			this.source.disconnectQueue[i].disconnect();
 		}
+		this.source.disconnectQueue = null;
+		try { this.source.stop(); } catch(e) {}
 	}
-	this.source.disconnect();
-	this.source = null;
-}
-
-Graph.prototype.disconnectOnEnd = function(x,y) {
-	var obj = {input:x,output:y};
-	if(this.disconnectQueue == null) this.disconnectQueue = new Array;
-	this.disconnectQueue.unshift(obj);
 }
 
 Graph.prototype.disconnectHandler = function() {
-	var closure = this;
+	var closure = this.source;
 	return function() {
-		//try{console.log("end playback: " + closure.source.playbackRate.value)}catch(e){console.log(e)}
-		if(closure.disconnectQueue == null) return;
-		for(var i in closure.disconnectQueue) {
-			var x = closure.disconnectQueue[i];
-			if(x.input == null) throw Error("first of pair of things to disconnect must exist");
-			if(x.output == null) x.input.disconnect();
-			else x.input.disconnect(x.output);
-		}
+		if(closure.disconnectQueue == null) { throw Error("WebDirt: no disconnectQueue"); }
+		for(var i in closure.disconnectQueue) { closure.disconnectQueue[i].disconnect(); }
+		closure.disconnectQueue = null;
 	}
 }
 
@@ -151,6 +143,7 @@ Graph.prototype.bandPassFilter=function(input, bandf, bandq){
 	//Bandpass Filter
 	if(bandf>0 && bandf<1 && bandq>0){
 			filterNode = this.ac.createBiquadFilter();
+			this.disconnectOnEnd(filterNode);
 			filterNode.type = 'bandpass';
 			filterNode.frequency.value = bandf;
 			filterNode.Q.value = bandq;
@@ -167,8 +160,7 @@ Graph.prototype.coarse = function(input, coarse){
   if(coarse > 1 && this.ac.audioWorklet != null) {
     var coarseProcessorNode = new AudioWorkletNode(this.ac,'coarse-processor');
     coarseProcessorNode.parameters.get('coarse').value = coarse;
-    input.connect(coarseProcessorNode); 
-    this.disconnectOnEnd(input,coarseProcessorNode);
+    input.connect(coarseProcessorNode);
     this.disconnectOnEnd(coarseProcessorNode);
     return coarseProcessorNode;
   } else {
@@ -183,7 +175,6 @@ Graph.prototype.crush = function(input, crush){
     var crushProcessorNode = new AudioWorkletNode(this.ac,'crush-processor');
     crushProcessorNode.parameters.get('crush').value = crush;
     input.connect(crushProcessorNode);
-    this.disconnectOnEnd(input,crushProcessorNode);
     this.disconnectOnEnd(crushProcessorNode);
     return crushProcessorNode;
   } else {
@@ -226,18 +217,21 @@ Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
 	outputGain = Math.abs(outputGain);
 	if(outputGain!=0){
 		var delayNode = this.ac.createDelay();
+		this.disconnectOnEnd(delayNode);
 		if(isNaN(parseInt(delayTime))) {
-			console.log("warning: delaytime not a number, using default of 1");
+			console.log("WebDirt: warning: delaytime not a number, using default of 1");
 			delayTime = 1;
 		}
 		delayNode.delayTime.value = delayTime;
 		var feedBackGain = this.ac.createGain();
+		this.disconnectOnEnd(feedBackGain);
 		if(isNaN(parseInt(delayFeedback))) {
-			console.log("warning: delayfeedback not a number, using default of 0.5");
+			console.log("WebDirt: warning: delayfeedback not a number, using default of 0.5");
 			delayFeedback = 0.5;
 		}
 		feedBackGain.gain.value= Math.min(Math.abs(delayFeedback), 0.995);
 		var delayGain = this.ac.createGain();
+		this.disconnectOnEnd(delayGain);
 		delayGain.gain.value = outputGain;
 		input.connect(delayNode);
 		delayNode.connect(feedBackGain);
@@ -263,6 +257,7 @@ Graph.prototype.highPassFilter = function (input, hcutoff, hresonance){
 
 			//Resonance@
 			filterNode = this.ac.createBiquadFilter();
+			this.disconnectOnEnd(filterNode);
 			filterNode.type = 'peaking';
 			filterNode.frequency.value = hcutoff;
 			filterNode.Q.value=70;
@@ -290,7 +285,7 @@ Graph.prototype.loop = function(input, loopCount){
 	this.source.stop(this.when+(dur*loopCount)/this.source.playbackRate.value);
 	return input;
 	}catch(e){
-		console.log("Warning: buffer data not yet available to calculate loop time - no looping applied")
+		console.log("WebDirt Warning: buffer data not yet available to calculate loop time - no looping applied")
 		return input
 	}
 }
@@ -300,6 +295,7 @@ Graph.prototype.lowPassFilter = function(input, cutoff, resonance){
 	if(cutoff>0 && resonance>0 && resonance<1){
 //resonance>0 && resonance<=1 &&
 			var filterNode = this.ac.createBiquadFilter();
+			this.disconnectOnEnd(filterNode);
 			filterNode.type = 'lowpass';
 			filterNode.frequency.value = cutoff;
 			filterNode.Q.value = resonance
@@ -345,7 +341,7 @@ Graph.prototype.accelerate = function(accelerateValue, speed){
 			try{
 				this.source.playbackRate.linearRampToValueAtTime(rampValue,this.when+this.source.buffer.duration);
 			}catch(e){
-				console.log("Warning, buffer data not loaded, could not apply acclerate effect")
+				console.log("WebDirt: Warning, buffer data not loaded, could not apply acclerate effect")
 			}
 		}
 	}
@@ -382,7 +378,7 @@ Graph.prototype.accel = function(buffer, accelerateValue, speed){
 	//if buffer data isn't loaded yet, affect isn't applied
 	try{var frames = buffer.length;}
 	catch(e){
-		console.log("Warning, buffer data not loaded, accelerate effect not applied");
+		console.log("WebDirt: Warning, buffer data not loaded, accelerate effect not applied");
 		return
 	}
 
@@ -438,7 +434,6 @@ Graph.prototype.shape = function(input, shape){
     var shapeProcessorNode = new AudioWorkletNode(this.ac,'shape-processor');
     shapeProcessorNode.parameters.get('shape').value = shape;
     input.connect(shapeProcessorNode);
-    this.disconnectOnEnd(input,shapeProcessorNode);
     this.disconnectOnEnd(shapeProcessorNode);
     return shapeProcessorNode;
   } else {
@@ -469,6 +464,7 @@ Graph.prototype.vowel= function (input, vowel){
 	if (vowel=='a'||vowel=='e'||vowel=='i'||vowel=='o'||vowel=='u'){
 			var frequencies,q,gains;
 			var makeupGain = this.ac.createGain();
+			this.disconnectOnEnd(makeupGain);
 
 			switch (vowel){
 				case('a'):
@@ -498,14 +494,16 @@ Graph.prototype.vowel= function (input, vowel){
 			}
 			for(var i=0; i<5; i++){
 				var gain = this.ac.createGain();
+				this.disconnectOnEnd(gain);
 				gain.gain.value = gains[i];
-				var filterNode = this.ac.createBiquadFilter()
-				filterNode.type = 'bandpass'
+				var filterNode = this.ac.createBiquadFilter();
+				this.disconnectOnEnd(filterNode);
+				filterNode.type = 'bandpass';
 				filterNode.Q.value=q[i]/8;
 				filterNode.frequency.value=frequencies[i];
 				input.connect(filterNode);
-				filterNode.connect(gain)
-				gain.connect(makeupGain)
+				filterNode.connect(gain);
+				gain.connect(makeupGain);
 
 			}
 			//@how much makeup gain to add?
@@ -523,4 +521,3 @@ vowelFormant = {
 	o: {freqs:[430, 820, 2700, 3000, 3300], amps: [1, 0.3162, 0.0501, 0.0794, 0.01995], qs: [40, 80, 100, 120, 120]},
 	u: {freqs:[370, 630, 2750, 3000, 3400], amps: [ 1, 0.1, 0.0708, 0.0316, 0.01995], qs: [40, 60, 100, 120, 120]}
 }
-
