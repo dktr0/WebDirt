@@ -81,10 +81,9 @@ function Graph(msg,ac,sampleBank,outputNode, cutGroups){
 	if(msg.gain > 2) msg.gain = 2;
 	if(msg.gain < 0) msg.gain = 0;
 	if(isNaN(parseFloat(msg.overgain))) msg.overgain = 0;
-	var effectiveGain = msg.gain + msg.overgain;
 	this.gain = ac.createGain();
 	this.disconnectOnEnd(this.gain);
-	this.gain.gain.value = Math.abs(Math.pow(msg.gain,4));
+	this.gain.gain.value = Math.abs(Math.pow(msg.gain+msg.overgain,4));
 	last.connect(this.gain);
 	var last = this.gain;
 
