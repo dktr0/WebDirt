@@ -78,6 +78,10 @@ function Graph(msg,ac,sampleBank,outputNode, cutGroups){
 
 	//Gain
 	if(isNaN(parseFloat(msg.gain))) msg.gain = 1;
+	if(msg.gain > 2) msg.gain = 2;
+	if(msg.gain < 0) msg.gain = 0;
+	if(isNaN(parseFloat(msg.overgain))) msg.overgain = 0;
+	var effectiveGain = msg.gain + msg.overgain;
 	this.gain = ac.createGain();
 	this.disconnectOnEnd(this.gain);
 	this.gain.gain.value = Math.abs(Math.pow(msg.gain,4));
@@ -430,6 +434,7 @@ Graph.prototype.reverseBuffer= function(buffer){
 Graph.prototype.shape = function(input, shape){
   shape = parseFloat(shape);
   if(isNaN(shape)) shape = 0;
+	if(shape >= 1) shape = 0.999;
   if(shape>0 && this.ac.audioWorklet != null ) {
     var shapeProcessorNode = new AudioWorkletNode(this.ac,'shape-processor');
     shapeProcessorNode.parameters.get('shape').value = shape;
