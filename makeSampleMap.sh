@@ -2,7 +2,7 @@
 printf "{\n"
 dircount=0
 # for d in $searchRoot/*; do
-find $1 -mindepth 1 -maxdepth 1 -iname "*" | while read d; do
+find $1 -s -mindepth 1 -maxdepth 1 -iname "*" | while read d; do
   if [ -d "$d" ]
   then
     if [ $dircount -ne 0 ]
@@ -14,7 +14,7 @@ find $1 -mindepth 1 -maxdepth 1 -iname "*" | while read d; do
     printf "\"%s\": [" "$dirname"
     search2=$searchRoot/$dirname/*.WAV
     filecount=0
-    find "$d" -iname "*.wav" | while read f; do
+    find "$d" -s -iname "*.wav" | while read f; do
     # for f in $search2; do
       filename=$(printf %q "$f")
       basename=${f##*/}
