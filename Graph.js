@@ -142,21 +142,6 @@ Graph.prototype.disconnectHandler = function() {
 ////////////////////////////////////////////
 
 
-Graph.prototype.bandPassFilter=function(input, bandf, bandq){
-	//Bandpass Filter
-	if(bandf>0 && bandf<1 && bandq>0){
-			filterNode = this.ac.createBiquadFilter();
-			this.disconnectOnEnd(filterNode);
-			filterNode.type = 'bandpass';
-			filterNode.frequency.value = bandf;
-			filterNode.Q.value = bandq;
-
-			input.connect(filterNode);
-			return filterNode;
-	}
-	else return input;
-}
-
 Graph.prototype.coarse = function(input, coarse){
   coarse = parseInt(coarse);
   if(isNaN(coarse)) coarse = 1;
@@ -248,30 +233,71 @@ Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
 
 
 Graph.prototype.highPassFilter = function (input, hcutoff, hresonance){
-
-	if(hresonance>0 && hresonance<1 && hcutoff>0){
-			//Filtering
-			filterNode = this.ac.createBiquadFilter();
-			filterNode.type = 'highpass';
-			filterNode.frequency.value = hcutoff;
-			filterNode.Q.value = 0.1;
-			input.connect(filterNode);
-			input = filterNode;
-
-			//Resonance@
-			filterNode = this.ac.createBiquadFilter();
-			this.disconnectOnEnd(filterNode);
-			filterNode.type = 'peaking';
-			filterNode.frequency.value = hcutoff;
-			filterNode.Q.value=70;
-			filterNode.gain.value = hresonance*10;
-			input.connect(filterNode);
-
-			input.connect(filterNode);
-			return filterNode;
-	}
-	else return input;
+	if(isNaN(parseFloat(hcutoff)) && isNaN(parseFloat(hresonance))) return input;
+	// sanitize parameters
+	if(isNaN(parseFloat(hcutoff))) hcutoff = 440;
+	if(hcutoff<20) hcutoff = 20;
+	if(hcutoff>20000) hcutoff = 20000;
+	if(isNaN(parseFloat(hresonance))) hresonance = 0;
+	if(hresonance<0) hresonance = 0;
+	if(hresonance>1) hresonance = 1;
+	hresonance = hresonance * hresonance;
+	hresonance = 1 - (0.999 * hresonance);
+	hresonance = 1/hresonance;
+	// instantiate web audio node
+	var filterNode = this.ac.createBiquadFilter();
+	this.disconnectOnEnd(filterNode);
+	filterNode.type = 'highpass';
+	filterNode.frequency.value = hcutoff;
+	filterNode.Q.value = hresonance;
+	input.connect(filterNode);
+	return filterNode;
 }
+
+
+Graph.prototype.lowPassFilter = function(input, cutoff, resonance){
+	if(isNaN(parseFloat(cutoff)) && isNaN(parseFloat(resonance))) return input;
+	// sanitize parameters
+	if(isNaN(parseFloat(cutoff))) cutoff = 440;
+	if(cutoff<20) cutoff = 20;
+	if(cutoff>20000) cutoff = 20000;
+	if(isNaN(parseFloat(resonance))) resonance = 0;
+	if(resonance<0) resonance = 0;
+	if(resonance>1) resonance = 1;
+	resonance = resonance * resonance;
+	resonance = 1 - (0.999 * resonance);
+	resonance = 1/resonance;
+	// instantiate web audio node
+	var filterNode = this.ac.createBiquadFilter();
+	this.disconnectOnEnd(filterNode);
+	filterNode.type = 'lowpass';
+	filterNode.frequency.value = cutoff;
+	filterNode.Q.value = resonance;
+	input.connect(filterNode);
+	return filterNode;
+}
+
+
+Graph.prototype.bandPassFilter=function(input, bandf, bandq){
+	if(isNaN(parseFloat(bandf)) && isNaN(parseFloat(bandq))) return input;
+	// sanitize parameters
+	if(isNaN(parseFloat(bandf))) bandf = 440;
+	if(bandf<20) bandf = 20;
+	if(bandf>20000) bandf = 20000;
+	if(isNaN(parseFloat(bandq))) bandq = 10;
+	if(bandq<1) bandq = 1;
+	if(bandq>100) bandq = 100;
+	// instantiate web audio node
+	var filterNode = this.ac.createBiquadFilter();
+	this.disconnectOnEnd(filterNode);
+	filterNode.type = 'bandpass';
+	filterNode.frequency.value = bandf;
+	filterNode.Q.value = bandq;
+	filterNode.gain.value = bandq;
+	input.connect(filterNode);
+	return filterNode;
+}
+
 
 //Loop effect
 //@Calibrate w/ accelerate when accelerate is fully working
@@ -291,31 +317,6 @@ Graph.prototype.loop = function(input, loopCount){
 		console.log("WebDirt Warning: buffer data not yet available to calculate loop time - no looping applied")
 		return input
 	}
-}
-
-Graph.prototype.lowPassFilter = function(input, cutoff, resonance){
-
-	if(cutoff>0 && resonance>0 && resonance<1){
-//resonance>0 && resonance<=1 &&
-			var filterNode = this.ac.createBiquadFilter();
-			this.disconnectOnEnd(filterNode);
-			filterNode.type = 'lowpass';
-			filterNode.frequency.value = cutoff;
-			filterNode.Q.value = resonance
-
-			input.connect(filterNode);
-			input = filterNode;
-
-			// filterNode = this.ac.createBiquadFilter();
-			// filterNode.type = 'peaking';
-			// filterNode.frequency.value = cutoff*14000;
-			// filterNode.Q.value=resonance;
-			// filterNode.gain.value = resonance*15;
-			// input.connect(filterNode);
-			return filterNode;
-	}
-	else return input
-
 }
 
 
