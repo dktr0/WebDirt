@@ -30,8 +30,9 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups){
 	this.source.playbackRate.value = Math.abs(msg.speed);
 
   // reverse and accelerate buffer if it is already available and as necessary
-	var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
-	if(msg.speed<0 && buffer != null) buffer=this.reverseBuffer(buffer);
+	var buffer;
+  if(msg.speed>=0) buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
+  else buffer = sampleBank.getReverseBuffer(msg.sample_name,msg.sample_n);
 	buffer = this.accel(buffer, msg.accelerate, msg.speed);
 	// if the buffer is already available, connect it to the bufferSourceNode and start...
 	if(buffer != null) {
@@ -44,9 +45,10 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups){
 		if(reattemptDelay <= 0) reattemptDelay = (msg.when-ac.currentTime-0.2)*1000; // ...or 0.1 seconds if 0.2 not possible
 		if(reattemptDelay > 0) {
 			setTimeout(function(){
-				var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
+				var buffer;
+        if(msg.speed>=0) buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
+        else buffer = sampleBank.getReverseBuffer(msg.sample_name,msg.sample_n);
 				if(buffer != null) {
-				  if(msg.speed<0) buffer=this.reverseBuffer(buffer);
 					buffer = closure.accel(buffer, msg.accelerate, msg.speed);
 					closure.source.buffer = buffer;
 					closure.start();
@@ -401,29 +403,6 @@ Graph.prototype.accel = function(buffer, accelerateValue, speed){
 	return newBuffer;
 }
 
-
-//Returns a new BufferSourceNode containing a buffer with the reversed frames of the
-//parameter 'buffer'
-//@channels
-Graph.prototype.reverseBuffer = function(buffer) {
-	var frames = buffer.length;
-	var pcmData = new Float32Array(frames);
-	var newBuffer = this.ac.createBuffer(buffer.numberOfChannels,buffer.length,this.ac.sampleRate);
-	// var source = ac.createBufferSource();
-	var newChannelData = new Float32Array(frames);
-
-	for(var channel=0; channel<buffer.numberOfChannels; channel++){
-		buffer.copyFromChannel(pcmData,channel,0);
-		for (var i =0;i<frames;i++){
-			newChannelData[i]=pcmData[frames-i];
-		}
-		//First element of newChannelData will be set to NaN - causes clipping on first frame
-		//set to second element to get rid of clipping
-		newChannelData[0]=newChannelData[1];
-		newBuffer.copyToChannel(newChannelData,channel,0);
-	}
-	return newBuffer;
-}
 
 Graph.prototype.shape = function(input, shape){
   shape = parseFloat(shape);

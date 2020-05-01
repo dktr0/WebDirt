@@ -1,5 +1,5 @@
 WebDirt is a rewrite of Alex McLean's Dirt sampling engine (by Alex McLean) to run in the web browser
-using the Web Audio API. Contributors are Jamie Beverley and David Ogborn.
+using the Web Audio API. Contributors are Jamie Beverley and David Ogborn. It was created for (and can be tried, live, in) the Estuary live coding platform: https://github.com/dktr0/Estuary.git
 
 From a JavaScript point of view it is used as follows.
 
@@ -18,13 +18,8 @@ webDirt.subscribeToTidalSocket(url,withLog); // subscribe to a TidalSocket over 
 
 You can preload a given sample (name and number) into WebDirt's sample bank to make sure it is available for immediate use:
 ```
-webDirt.sampleBank.load("name",7); // to preload the 8th sample in the sample folder indexed by 'name'
+var fileName = webDirt.getFilename("mySample",7);
+webDirt.sampleBank.load(fileName); // to preload the 8th sample in the sample folder indexed by 'name'
 ```
 
-For running test.html in Chrome, open Chrome with tags:
-
-OS X:  open -a 'Google Chrome' --args -allow-file-access-from-files
-
-Windows:  C:\ ... \Application\chrome.exe --allow-file-access-from-files
-
-More info soon!!
+The best places for questions and discussion about WebDirt is the #estuary channel at https://chat.toplap.org or the Estuary Google group at https://groups.google.com/forum/#!forum/estuary.
