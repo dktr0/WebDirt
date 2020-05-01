@@ -59,46 +59,6 @@ WebDirt.prototype.initializeWebAudio = function() {
     this.tempo = {time:this.ac.currentTime,beats:0,bpm:30};
     this.clockDiff = (Date.now() / 1000) - this.ac.currentTime;
     this.sampleBank.ac = this.ac;
-/*    this.compressor = this.ac.createDynamicsCompressor();
-    this.compressor.threshold.value= 20; //value taken in decibels
-    this.compressor.knee.value = 10; //Low/hard knee
-    this.compressor.ratio.value = 4;
-    this.compressor.attack.value = 0.05;
-    this.compressor.release.value = 0.1; //More slowly go back. */
-
-/*    this.levelMeter = this.ac.createScriptProcessor(1024,2,0);
-    var levelMeterClosure = this.levelMeter;
-    this.levelMeter.onaudioprocess = function (e) {
-      var leftIn = e.inputBuffer.getChannelData(0);
-      var rightIn = e.inputBuffer.getChannelData(1);
-      var leftPeak = 0;
-      var rightPeak = 0;
-      var leftRms = 0;
-      var rightRms = 0;
-      var left, right;
-      for(var x=0;x<leftIn.length;x++) {
-        left = leftIn[x];
-        right = rightIn[x];
-        if(Math.abs(left) > leftPeak) leftPeak = left;
-        if(Math.abs(right) > rightPeak) rightPeak = right;
-        leftRms = leftRms + (left*left);
-        rightRms = rightRms + (right*right);
-      }
-      leftRms = Math.sqrt(leftRms/leftIn.length);
-      rightRms = Math.sqrt(rightRms/rightIn.length);
-      leftPeak = 20 * Math.log10(leftPeak);
-      rightPeak = 20 * Math.log10(rightPeak);
-      leftRms = 20 * Math.log10(leftRms);
-      rightRms = 20 * Math.log10(rightRms);
-      levelMeterClosure.peak = [leftPeak,rightPeak];
-      levelMeterClosure.rms = [leftRms,rightRms];
-    }; */
-    // this.compressor.connect(this.levelMeter);
-
-    // this.analyser = this.ac.createAnalyser();
-    // this.compressor.connect(this.analyser);
-    // this.analyser.connect(this.destination);
-    // this.soundMeter();
 
     this.silentNote = this.ac.createOscillator();
     this.silentNote.type = 'sine';
@@ -143,47 +103,6 @@ WebDirt.prototype.playSample = function(msg,latency) {
   return new Graph(msg,this.ac,this.sampleBank,this.destination,this.cutGroups);
 }
 
-WebDirt.prototype.soundMeter = function () {
-  console.log(this.analyser);
-  var scriptNode = this.ac.createScriptProcessor(2048, 1, 1);// @2?
-  this.analyser.connect(scriptNode);
-  this.analyser.smoothingTimeConstant = 0.9;
-  this.analyser.fftSize = 1024;
-
-  var canvas = document.getElementById('soundMeter'); // in your HTML this element appears as <canvas id="mycanvas"></canvas>
-  var ctx = canvas.getContext('2d');
-
-  var gradient = ctx.createLinearGradient(0,0,0,300);
-  gradient.addColorStop(1,'#000000');
-  gradient.addColorStop(0.75,'#ff0000');
-  gradient.addColorStop(0.25,'#ffff00');
-  gradient.addColorStop(0,'#ffffff');
-
-
-  var analyser = this.analyser
-  scriptNode.onaudioprocess = function() {
-
-      var array =  new Uint8Array(analyser.frequencyBinCount);
-      analyser.getByteFrequencyData(array);
-      var average = getAverageVolume(array)
-      ctx.clearRect(0, 0, 60, 130);
-      ctx.fillStyle=gradient;
-      // create the meters
-      ctx.fillRect(0,130-average,25,130);
-  }
-
-    function getAverageVolume(array) {
-        var values = 0;
-        var average;
-        var length = array.length;
-        for (var i = 0; i < length; i++) {
-            values += array[i];
-        }
-        average = values / length;
-        return average;
-    }
-
-}
 
 WebDirt.prototype.playScore = function(score,latency,finishedCallback) {
   // where score is an array of message objects (each of which fulfills same expectations as the method 'playSample' above)

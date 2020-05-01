@@ -1,82 +1,78 @@
-var cps = 1;
-function Graph(msg,ac,sampleBank,outputNode, cutGroups){
-	this.cutGroups=cutGroups
+
+function Graph(msg,ac,sampleBank,outputNode,cutGroups){
+
+  msg.sample_n = parseInt(msg.sample_n);
+  if(isNaN(msg.sample_n)) msg.sample_n=0;
+  // fail loudly if someone requests a sample not present in the sample map
+  if(!sampleBank.sampleNameExists(msg.sample_name)) {
+    console.log("WebDirt: no sample named " + msg.sample_name + " exists in sample map");
+    return;
+  }
+  // fail silently if we have already had a fatal error loading this specific sample
+  if(!sampleBank.getBufferMightSucceed(msg.sample_name,msg.sample_n)) return;
+
+	this.cutGroups = cutGroups;
 	this.ac = ac;
-	var last,temp;
 	this.when = msg.when;
 
-	// get basic buffer player, including speed change and sample reversal
+	// get basic buffer source, including speed change and sample reversal
+	var last;
 	this.source = last = ac.createBufferSource();
+	this.source.onended = this.disconnectHandler() ;
 	this.disconnectOnEnd(this.source);
 	if(isNaN(parseInt(msg.begin))) msg.begin = 0;
 	if(isNaN(parseInt(msg.end))) msg.end = 1;
 	this.begin = msg.begin;
 	this.end = msg.end;
-
-	var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
-
 	if(isNaN(parseInt(msg.speed))) msg.speed = 1;
 	if(isNaN(parseInt(msg.note))) msg.note = 0;
 	msg.speed = msg.speed * Math.pow(2,msg.note/12);
+	this.source.playbackRate.value = Math.abs(msg.speed);
 
-	//^if(msg.speed>=0 && buffer != null) this.source.buffer = buffer;
-	if(msg.speed<0 && buffer != null)  buffer =this.reverseBuffer(buffer) //^
-	msg.speed = Math.abs(msg.speed)
-	this.source.playbackRate.value = msg.speed;
-
-	//Accelerate
-	//Note: because accelerate relies on manipulating raw buffer values, the buffer must be modified
-	//      before setting the source's buffer equal to something (the WA API doesn't allow for the
-	//      buffer property to be reset)
+  // reverse and accelerate buffer if it is already available and as necessary
+	var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
+	if(msg.speed<0 && buffer != null) buffer=this.reverseBuffer(buffer);
 	buffer = this.accel(buffer, msg.accelerate, msg.speed);
-
+	// if the buffer is already available, connect it to the bufferSourceNode and start...
 	if(buffer != null) {
 		this.source.buffer = buffer;
 		this.start();
-	}
-	else { // buffer not available but may be available soon
+	} // otherwise, the buffer may be available soon, so (if there's time) schedule a timeOut to possibly start it soon...
+	else {
 		var closure = this;
-		var reattemptDelay = (msg.when-ac.currentTime-0.2)*1000;
-		setTimeout(function(){
-			var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
-			//Still need to apply all effects that rely on buffer manipulation:
-			buffer = closure.accel(buffer,msg.accelerate,msg.speed);
-			if(buffer != null) {
-				closure.source.buffer = buffer;
-				closure.start();
-			}
-			else {
-				console.log("WebDirt: unable to access sample " + msg.sample_name + ":" + msg.sample_n + " on second attempt");
-				closure.stopAll();
-			}
-		},reattemptDelay);
+		var reattemptDelay = (msg.when-ac.currentTime-0.2)*1000; // wake-up 0.2 seconds before note start...
+		if(reattemptDelay <= 0) reattemptDelay = (msg.when-ac.currentTime-0.2)*1000; // ...or 0.1 seconds if 0.2 not possible
+		if(reattemptDelay > 0) {
+			setTimeout(function(){
+				var buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
+				if(buffer != null) {
+				  if(msg.speed<0) buffer=this.reverseBuffer(buffer);
+					buffer = closure.accel(buffer, msg.accelerate, msg.speed);
+					closure.source.buffer = buffer;
+					closure.start();
+				}
+				else {
+					console.log("WebDirt: unable to access sample " + msg.sample_name + ":" + msg.sample_n + " on second attempt");
+					closure.stopAll();
+				}
+			},reattemptDelay);
+		}
 	}
 
-
-	//Cut
+  // sound transformations/effects
 	this.cut(msg.cut, msg.sample_name);
-	// Distortion
 	last = this.shape(last, msg.shape);
-	//Lowpass filtering @what level/function to set frequency and resonant gain at?
 	last = this.lowPassFilter(last, msg.cutoff, msg.resonance);
-	//higpass filtering @what level/function to set frequency and resonant gain at?
 	last = this.highPassFilter(last, msg.hcutoff, msg.hresonance)
-	//Band Pass Filtering @where to set frequency ranges?
 	last = this.bandPassFilter(last, msg.bandf, msg.bandq)
-	//Vowel
 	last = this.vowel(last, msg.vowel);
-	// Delay
 	last = this.delay(last,msg.delay,msg.delaytime,msg.delayfeedback);
-	//Loop
 	last = this.loop(last, msg.loop, msg.begin, msg.end, msg.speed);
-	//Crush
 	last = this.crush(last, msg.crush);
-	//Coarse
 	last = this.coarse(last, msg.coarse);
-
 	this.unit(msg.unit,msg.speed);
 
-	//Gain
+	// gain
 	if(isNaN(parseFloat(msg.gain))) msg.gain = 1;
 	if(msg.gain > 2) msg.gain = 2;
 	if(msg.gain < 0) msg.gain = 0;
@@ -87,17 +83,14 @@ function Graph(msg,ac,sampleBank,outputNode, cutGroups){
 	last.connect(this.gain);
 	var last = this.gain;
 
-	//Panning (currently stereo)
+	// panning (currently stereo)
 	if(isNaN(parseFloat(msg.pan))) msg.pan = 0.5;
 	var gain1 = ac.createGain();
 	this.disconnectOnEnd(gain1);
 	var gain2 = ac.createGain();
 	this.disconnectOnEnd(gain2);
-
-	//Equal power panning @
 	gain1.gain.value = Math.cos(msg.pan*Math.PI/2);
 	gain2.gain.value = Math.sin(msg.pan*Math.PI/2);
-
 	last.connect(gain1);
 	last.connect(gain2);
 	var channelMerger = ac.createChannelMerger(2);
@@ -105,8 +98,7 @@ function Graph(msg,ac,sampleBank,outputNode, cutGroups){
 	gain1.connect(channelMerger,0,0);
 	gain2.connect(channelMerger,0,1);
 	channelMerger.connect(outputNode);
-
-}// End Graph
+}
 
 Graph.prototype.disconnectOnEnd = function(x) {
 	if(this.source.disconnectQueue == null) this.source.disconnectQueue = new Array;
@@ -114,7 +106,6 @@ Graph.prototype.disconnectOnEnd = function(x) {
 }
 
 Graph.prototype.start = function() {
-	this.source.onended = this.disconnectHandler();
 	this.source.start(this.when,this.begin*this.source.buffer.duration,this.end*this.source.buffer.duration);
 }
 
@@ -322,6 +313,7 @@ Graph.prototype.loop = function(input, loopCount){
 
 //Accelerate @negative values aren't quite right
 Graph.prototype.accelerate = function(accelerateValue, speed){
+	speed = Math.abs(speed);
 	if(isNaN(parseFloat(accelerateValue))) accelerateValue = 0;
 
 	if(accelerateValue!=0){
@@ -411,7 +403,7 @@ Graph.prototype.accel = function(buffer, accelerateValue, speed){
 //Returns a new BufferSourceNode containing a buffer with the reversed frames of the
 //parameter 'buffer'
 //@channels
-Graph.prototype.reverseBuffer= function(buffer){
+Graph.prototype.reverseBuffer = function(buffer) {
 	var frames = buffer.length;
 	var pcmData = new Float32Array(frames);
 	var newBuffer = this.ac.createBuffer(buffer.numberOfChannels,buffer.length,this.ac.sampleRate);
@@ -459,7 +451,7 @@ Graph.prototype.unit = function(unit, speed){
     // a->speed = sample->info->frames * a->speed * a->cps / samplerate;
 
     if (unit == 'c')
-    	this.source.playbackRate.value = this.source.playbackRate.value*this.source.buffer.duration/cps;
+    	this.source.playbackRate.value = this.source.playbackRate.value*this.source.buffer.duration;
 }
 
 //Vowel effect
