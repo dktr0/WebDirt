@@ -122,9 +122,11 @@ Graph.prototype.stopAll = function() {
 Graph.prototype.disconnectHandler = function() {
 	var closure = this.source;
 	return function() {
-		if(closure.disconnectQueue == null) { throw Error("WebDirt: no disconnectQueue"); }
-		for(var i in closure.disconnectQueue) { closure.disconnectQueue[i].disconnect(); }
-		closure.disconnectQueue = null;
+    setTimeout(function(){
+      if(closure.disconnectQueue == null) { throw Error("WebDirt: no disconnectQueue"); }
+      for(var i in closure.disconnectQueue) { closure.disconnectQueue[i].disconnect(); }
+      closure.disconnectQueue = null;
+    },250);
 	}
 }
 
