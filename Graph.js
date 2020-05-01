@@ -74,25 +74,22 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups){
 	last = this.coarse(last, msg.coarse);
 	this.unit(msg.unit,msg.speed);
 
-	// gain
-	if(isNaN(parseFloat(msg.gain))) msg.gain = 1;
-	if(msg.gain > 2) msg.gain = 2;
-	if(msg.gain < 0) msg.gain = 0;
-	if(isNaN(parseFloat(msg.overgain))) msg.overgain = 0;
-	this.gain = ac.createGain();
-	this.disconnectOnEnd(this.gain);
-	this.gain.gain.value = Math.abs(Math.pow(msg.gain+msg.overgain,4));
-	last.connect(this.gain);
-	var last = this.gain;
-
-	// panning (currently stereo)
-	if(isNaN(parseFloat(msg.pan))) msg.pan = 0.5;
+	// gain and panning (currently stereo)
+  var gain = parseFloat(msg.gain);
+	if(isNaN(gain)) gain = 1;
+	if(gain > 2) gain = 2;
+	if(gain < 0) gain = 0;
+  var overgain = parseFloat(msg.overgain);
+	if(!isNaN(overgain)) gain = gain + overgain;
+  gain = Math.pow(gain,4);
+  var pan = parseFloat(msg.pan);
+	if(isNaN(pan)) pan = 0.5;
 	var gain1 = ac.createGain();
 	this.disconnectOnEnd(gain1);
 	var gain2 = ac.createGain();
 	this.disconnectOnEnd(gain2);
-	gain1.gain.value = Math.cos(msg.pan*Math.PI/2);
-	gain2.gain.value = Math.sin(msg.pan*Math.PI/2);
+	gain1.gain.value = Math.cos(pan*Math.PI/2)*gain;
+	gain2.gain.value = Math.sin(pan*Math.PI/2)*gain;
 	last.connect(gain1);
 	last.connect(gain2);
 	var channelMerger = ac.createChannelMerger(2);
