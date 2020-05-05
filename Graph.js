@@ -168,7 +168,6 @@ Graph.prototype.crush = function(input, crush){
 Graph.prototype.cut = function(cut, sample_name){
   cut = parseInt(cut);
   if(isNaN(cut) || cut == 0) return;
-  console.log(cut + " " + this.cutGroups.length);
   var group = {cutGroup: cut, node: this, sampleName: sample_name};
   for(var i =0; i<this.cutGroups.length; i++) {
     var x = this.cutGroups[i];
