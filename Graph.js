@@ -92,6 +92,8 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups){
 	gain2.gain.value = Math.sin(pan*Math.PI/2)*gain;
 	last.connect(gain1);
 	last.connect(gain2);
+  this.gain1 = gain1;
+  this.gain2 = gain2;
 	var channelMerger = ac.createChannelMerger(2);
 	this.disconnectOnEnd(channelMerger);
 	gain1.connect(channelMerger,0,0);
@@ -162,34 +164,29 @@ Graph.prototype.crush = function(input, crush){
   }
 }
 
-//Cut
+
 Graph.prototype.cut = function(cut, sample_name){
-	if (cut!=0 && !isNaN(parseInt(cut))){
-		if(isNaN(cut)) cut = parseInt(cut)
-		var group = {cutGroup: cut, node: this, sampleName: sample_name}
+  cut = parseInt(cut);
+  if(isNaN(cut) || cut == 0) return;
+  console.log(cut + " " + this.cutGroups.length);
+  var group = {cutGroup: cut, node: this, sampleName: sample_name};
+  for(var i =0; i<this.cutGroups.length; i++) {
+    var x = this.cutGroups[i];
+    if(x.cutGroup == cut) {
+      if(cut < 0) {
+        if(x.sampleName == sample_name) {
+          x.node.stop(this.when);
+          this.cutGroups.splice(i,1);
+        }
+      } else {
+        x.node.stop(this.when);
+        this.cutGroups.splice(i,1);
+      }
+    }
+  }
+  this.cutGroups.push(group);
+}
 
-		for(var i =0; i<this.cutGroups.length; i++){
-			if(group.cutGroup > 0){
-				if(this.cutGroups[i].cutGroup == group.cutGroup){
-					this.cutGroups[i].node.stop(this.when);
-					this.cutGroups.splice(i,1);
-					this.cutGroups.push(group);
-					return;
-				}
-			}
-			else{
-				if(this.cutGroups[i].cutGroup == group.cutGroup && group.sampleName==this.cutGroups[i].sampleName){
-
-					this.cutGroups[i].node.stop(this.when);
-					this.cutGroups.splice(i,1);
-					this.cutGroups.push(group);
-					return;
-				}
-			}
-		}
-		this.cutGroups.push(group);
-	}
-}//End Cut
 
 //Delay effect
 Graph.prototype.delay= function(input,outputGain,delayTime,delayFeedback) {
@@ -418,9 +415,10 @@ Graph.prototype.shape = function(input, shape){
 
 
 Graph.prototype.stop = function(time){
-	//setValueAtTime required so linearRampToValue doesn't start immediately
-	this.gain.gain.setValueAtTime(this.gain.gain.value, time)
-	this.gain.gain.linearRampToValueAtTime(0,time + 0.02);
+	this.gain1.gain.setValueAtTime(this.gain1.gain.value, time);
+	this.gain1.gain.linearRampToValueAtTime(0,time + 0.02);
+  this.gain2.gain.setValueAtTime(this.gain1.gain.value, time);
+  this.gain2.gain.linearRampToValueAtTime(0,time + 0.02);
 }
 
 //Unit
