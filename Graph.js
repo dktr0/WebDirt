@@ -1,15 +1,15 @@
 
 function Graph(msg,ac,sampleBank,outputNode,cutGroups){
 
-  msg.sample_n = parseInt(msg.sample_n);
-  if(isNaN(msg.sample_n)) msg.sample_n=0;
+  msg.n = parseInt(msg.n);
+  if(isNaN(msg.n)) msg.n=0;
   // fail loudly if someone requests a sample not present in the sample map
-  if(!sampleBank.sampleNameExists(msg.sample_name)) {
-    console.log("WebDirt: no sample named " + msg.sample_name + " exists in sample map");
+  if(!sampleBank.sampleNameExists(msg.s)) {
+    console.log("WebDirt: no sample named " + msg.s + " exists in sample map");
     return;
   }
   // fail silently if we have already had a fatal error loading this specific sample
-  if(!sampleBank.getBufferMightSucceed(msg.sample_name,msg.sample_n)) return;
+  if(!sampleBank.getBufferMightSucceed(msg.s,msg.n)) return;
 
 	this.cutGroups = cutGroups;
 	this.ac = ac;
@@ -31,8 +31,8 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups){
 
   // reverse and accelerate buffer if it is already available and as necessary
 	var buffer;
-  if(msg.speed>=0) buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
-  else buffer = sampleBank.getReverseBuffer(msg.sample_name,msg.sample_n);
+  if(msg.speed>=0) buffer = sampleBank.getBuffer(msg.s,msg.n);
+  else buffer = sampleBank.getReverseBuffer(msg.s,msg.n);
 	buffer = this.accel(buffer, msg.accelerate, msg.speed);
 	// if the buffer is already available, connect it to the bufferSourceNode and start...
 	if(buffer != null) {
@@ -46,15 +46,15 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups){
 		if(reattemptDelay > 0) {
 			setTimeout(function(){
 				var buffer;
-        if(msg.speed>=0) buffer = sampleBank.getBuffer(msg.sample_name,msg.sample_n);
-        else buffer = sampleBank.getReverseBuffer(msg.sample_name,msg.sample_n);
+        if(msg.speed>=0) buffer = sampleBank.getBuffer(msg.s,msg.n);
+        else buffer = sampleBank.getReverseBuffer(msg.s,msg.n);
 				if(buffer != null) {
 					buffer = closure.accel(buffer, msg.accelerate, msg.speed);
 					closure.source.buffer = buffer;
 					closure.start();
 				}
 				else {
-					console.log("WebDirt: unable to access sample " + msg.sample_name + ":" + msg.sample_n + " on second attempt");
+					console.log("WebDirt: unable to access sample " + msg.s + ":" + msg.n + " on second attempt");
 					closure.stopAll();
 				}
 			},reattemptDelay);
@@ -62,7 +62,7 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups){
 	}
 
   // sound transformations/effects
-	this.cut(msg.cut, msg.sample_name);
+	this.cut(msg.cut, msg.s);
 	last = this.shape(last, msg.shape);
 	last = this.lowPassFilter(last, msg.cutoff, msg.resonance);
 	last = this.highPassFilter(last, msg.hcutoff, msg.hresonance)
