@@ -99,10 +99,10 @@ SampleBank.prototype.sampleNameExists = function(name) {
 // note: will throw exception if sample map doesn't exist, or sample name not in sample map
 SampleBank.prototype.getFilename = function(name,number) {
   if(number == null) number = 0;
+  if(number < 0) number = this.sampleMap[name].length - (Math.abs(number) % this.sampleMap[name].length);
   number = number % this.sampleMap[name].length;
   return this.sampleMap[name][number];
 }
-
 
 // note: will throw exception if sample map doesn't exist, or sample name not in sample map
 SampleBank.prototype.getBufferMightSucceed = function(name,number) {
