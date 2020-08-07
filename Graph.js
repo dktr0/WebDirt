@@ -1,15 +1,20 @@
 
 function Graph(msg,ac,sampleBank,outputNode,cutGroups){
 
-  msg.n = parseInt(msg.n);
-  if(isNaN(msg.n)) msg.n=0;
-  // fail loudly if someone requests a sample not present in the sample map
-  if(!sampleBank.sampleNameExists(msg.s)) {
-    console.log("WebDirt: no sample named " + msg.s + " exists in sample map");
-    return;
+  if(typeof msg.buffer === "object") {
+    console.log("playing buffer");
   }
-  // fail silently if we have already had a fatal error loading this specific sample
-  if(!sampleBank.getBufferMightSucceed(msg.s,msg.n)) return;
+  else {
+    msg.n = parseInt(msg.n);
+    if(isNaN(msg.n)) msg.n=0;
+    // fail loudly if someone requests a sample not present in the sample map
+    if(!sampleBank.sampleNameExists(msg.s)) {
+      console.log("WebDirt: no sample named " + msg.s + " exists in sample map");
+      return;
+    }
+    // fail silently if we have already had a fatal error loading this specific sample
+    if(!sampleBank.getBufferMightSucceed(msg.s,msg.n)) return;
+  }
 
 	this.cutGroups = cutGroups;
 	this.ac = ac;
@@ -31,9 +36,13 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups){
 
   // reverse and accelerate buffer if it is already available and as necessary
 	var buffer;
-  if(msg.speed>=0) buffer = sampleBank.getBuffer(msg.s,msg.n);
-  else buffer = sampleBank.getReverseBuffer(msg.s,msg.n);
-	buffer = this.accel(buffer, msg.accelerate, msg.speed);
+  if(typeof msg.buffer === "object") {
+    buffer = msg.buffer;
+  } else {
+    if(msg.speed>=0) buffer = sampleBank.getBuffer(msg.s,msg.n);
+    else buffer = sampleBank.getReverseBuffer(msg.s,msg.n);
+    buffer = this.accel(buffer, msg.accelerate, msg.speed);
+  }
 	// if the buffer is already available, connect it to the bufferSourceNode and start...
 	if(buffer != null) {
 		this.source.buffer = buffer;
