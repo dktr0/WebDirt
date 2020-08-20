@@ -134,7 +134,7 @@ Graph.prototype.disconnectHandler = function() {
 	return function() {
     setTimeout(function(){
       if(closure.disconnectQueue == null) { throw Error("WebDirt: no disconnectQueue"); }
-      for(var i in closure.disconnectQueue) { closure.disconnectQueue[i].disconnect(); }
+      for(var i in closure.disconnectQueue) closure.disconnectQueue[i].disconnect();
       closure.disconnectQueue = null;
     },250);
 	}
