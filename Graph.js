@@ -1,65 +1,54 @@
 
 function Graph(msg,ac,sampleBank,outputNode,cutGroups){
 
+  this.msg = msg;
   if(typeof msg.buffer === "object") {
-    console.log("playing buffer");
+    this.bufferContainer = msg.buffer;
   }
   else {
-    msg.n = parseInt(msg.n);
-    if(isNaN(msg.n)) msg.n=0;
+    this.msg.n = parseInt(this.msg.n);
+    if(isNaN(this.msg.n)) this.msg.n=0;
     // fail loudly if someone requests a sample not present in the sample map
-    if(!sampleBank.sampleNameExists(msg.s)) {
-      console.log("WebDirt: no sample named " + msg.s + " exists in sample map");
+    if(!sampleBank.sampleNameExists(this.msg.s)) {
+      console.log("WebDirt: no sample named " + this.msg.s + " exists in sample map");
       return;
     }
     // fail silently if we have already had a fatal error loading this specific sample
-    if(!sampleBank.getBufferMightSucceed(msg.s,msg.n)) return;
+    if(!sampleBank.getBufferMightSucceed(this.msg.s,this.msg.n)) return;
   }
 
 	this.cutGroups = cutGroups;
 	this.ac = ac;
-	this.when = msg.when;
+	this.when = this.msg.when;
 
 	// get basic buffer source, including speed change and sample reversal
 	var last;
 	this.source = last = ac.createBufferSource();
 	this.source.onended = this.disconnectHandler() ;
 	this.disconnectOnEnd(this.source);
-	if(isNaN(parseInt(msg.begin))) msg.begin = 0;
-	if(isNaN(parseInt(msg.end))) msg.end = 1;
-	this.begin = msg.begin;
-	this.end = msg.end;
-	if(isNaN(parseInt(msg.speed))) msg.speed = 1;
-	if(isNaN(parseInt(msg.note))) msg.note = 0;
-	msg.speed = msg.speed * Math.pow(2,msg.note/12);
-	this.source.playbackRate.value = Math.abs(msg.speed);
+	if(isNaN(parseInt(this.msg.begin))) this.msg.begin = 0;
+	if(isNaN(parseInt(this.msg.end))) this.msg.end = 1;
+	this.begin = this.msg.begin;
+	this.end = this.msg.end;
+	if(isNaN(parseInt(this.msg.speed))) this.msg.speed = 1;
+	if(isNaN(parseInt(this.msg.note))) this.msg.note = 0;
+	this.msg.speed = this.msg.speed * Math.pow(2,this.msg.note/12);
+	this.source.playbackRate.value = Math.abs(this.msg.speed);
 
-  // reverse and accelerate buffer if it is already available and as necessary
-	var buffer;
-  if(typeof msg.buffer === "object") {
-    buffer = msg.buffer;
-  } else {
-    if(msg.speed>=0) buffer = sampleBank.getBuffer(msg.s,msg.n);
-    else buffer = sampleBank.getReverseBuffer(msg.s,msg.n);
-    buffer = this.accel(buffer, msg.accelerate, msg.speed);
-  }
-	// if the buffer is already available, connect it to the bufferSourceNode and start...
-	if(buffer != null) {
-		this.source.buffer = buffer;
+  this.prepareBuffer(); // reverse and accelerate buffer if it is already available and as necessary
+	if(this.buffer != null) {
+		this.source.buffer = this.buffer;
 		this.start();
 	} // otherwise, the buffer may be available soon, so (if there's time) schedule a timeOut to possibly start it soon...
 	else {
 		var closure = this;
-		var reattemptDelay = (msg.when-ac.currentTime-0.2)*1000; // wake-up 0.2 seconds before note start...
-		if(reattemptDelay <= 0) reattemptDelay = (msg.when-ac.currentTime-0.2)*1000; // ...or 0.1 seconds if 0.2 not possible
+		var reattemptDelay = (this.msg.when-ac.currentTime-0.2)*1000; // wake-up 0.2 seconds before note start...
+		if(reattemptDelay <= 0) reattemptDelay = (this.msg.when-ac.currentTime-0.2)*1000; // ...or 0.1 seconds if 0.2 not possible
 		if(reattemptDelay > 0) {
 			setTimeout(function(){
-				var buffer;
-        if(msg.speed>=0) buffer = sampleBank.getBuffer(msg.s,msg.n);
-        else buffer = sampleBank.getReverseBuffer(msg.s,msg.n);
-				if(buffer != null) {
-					buffer = closure.accel(buffer, msg.accelerate, msg.speed);
-					closure.source.buffer = buffer;
+        closure.prepareBuffer();
+				if(closure.buffer != null) {
+					closure.source.buffer = closure.buffer;
 					closure.start();
 				}
 				else {
@@ -108,6 +97,26 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups){
 	gain1.connect(channelMerger,0,0);
 	gain2.connect(channelMerger,0,1);
 	channelMerger.connect(outputNode);
+}
+
+Graph.prototype.prepareBuffer = function () {
+  if(typeof this.bufferContainer === "object") {
+    if(typeof this.bufferContainer.buffer === "object") {
+      if(this.msg.speed>=0) this.buffer = this.bufferContainer.buffer;
+      else { // need reverse buffer
+        if(typeof this.bufferContainer.reverseBuffer === "object")
+          this.buffer = this.bufferContainer.reverseBuffer;
+        else { // calculate reverse buffer and store
+          this.bufferContainer.reverseBuffer = reverseBuffer(this.ac,this.bufferContainer.buffer);
+          this.buffer = this.bufferContainer.reverseBuffer;
+        }
+      }
+    }
+  } else {
+    if(this.msg.speed>=0) this.buffer = sampleBank.getBuffer(this.msg.s,this.msg.n);
+    else this.buffer = sampleBank.getReverseBuffer(this.msg.s,this.msg.n);
+    this.buffer = this.accel(this.buffer, this.msg.accelerate, this.msg.speed);
+  }
 }
 
 Graph.prototype.disconnectOnEnd = function(x) {

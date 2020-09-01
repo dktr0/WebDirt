@@ -155,24 +155,27 @@ SampleBank.prototype.getReverseBuffer = function(name,number) {
     }
     // if we have a cached "forward" buffer, use that to make, cache, and return a reversed buffer
     if(this.samples[filename].status == this.STATUS_READY) {
-      var buffer = this.samples[filename].buffer;
-      var frames = buffer.length;
-    	var pcmData = new Float32Array(frames);
-      var newBuffer = this.ac.createBuffer(buffer.numberOfChannels,buffer.length,this.ac.sampleRate);
-      var newChannelData = new Float32Array(frames);
-      for(var channel=0; channel<buffer.numberOfChannels; channel++) {
-        buffer.copyFromChannel(pcmData,channel,0);
-        for (var i =0;i<frames;i++) newChannelData[i]=pcmData[frames-i];
-        // First element of newChannelData will be set to NaN - causes clipping on first frame
-        // set to second element to get rid of clipping
-        newChannelData[0]=newChannelData[1];
-        newBuffer.copyToChannel(newChannelData,channel,0);
-      }
-      this.samples[filename].reverseBuffer = newBuffer;
-      return newBuffer;
+      this.samples[filename].reverseBuffer = reverseBuffer(this.ac,this.samples[filename].buffer);
+      return this.samples[filename].reverseBuffer;
     }
   }
   // in all other cases, we don't have any cached buffer to work with, so load one
   this.load(filename);
   return null;
+}
+
+function reverseBuffer(ac,buffer) {
+  var frames = buffer.length;
+  var pcmData = new Float32Array(frames);
+  var newBuffer = ac.createBuffer(buffer.numberOfChannels,buffer.length,ac.sampleRate);
+  var newChannelData = new Float32Array(frames);
+  for(var channel=0; channel<buffer.numberOfChannels; channel++) {
+    buffer.copyFromChannel(pcmData,channel,0);
+    for (var i =0;i<frames;i++) newChannelData[i]=pcmData[frames-i];
+    // First element of newChannelData will be set to NaN - causes clipping on first frame
+    // set to second element to get rid of clipping
+    newChannelData[0]=newChannelData[1];
+    newBuffer.copyToChannel(newChannelData,channel,0);
+  }
+  return newBuffer;
 }
