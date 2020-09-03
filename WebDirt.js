@@ -12,6 +12,7 @@ WebDirt = function(sampleMapUrl,sampleFolder,latency,readyCallback,maxLateness,a
   this.cutGroups = new Array;
   this.ac = audioContext;
   this.destination = destination;
+  this.eventCounter = 0;
   if(this.ac == null) {
     console.log("WebDirt initialized (without audio context yet)");
   } else {
@@ -100,7 +101,9 @@ WebDirt.prototype.playSample = function(msg,latency) {
     return;
   }
 
-  return new Graph(msg,this.ac,this.sampleBank,this.destination,this.cutGroups);
+  let r = new Graph(msg,this.ac,this.sampleBank,this.destination,this.cutGroups,this.eventCounter);
+  this.eventCounter++;
+  return r;
 }
 
 

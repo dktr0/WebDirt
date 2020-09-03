@@ -1,6 +1,7 @@
 
-function Graph(msg,ac,sampleBank,outputNode,cutGroups){
+function Graph(msg,ac,sampleBank,outputNode,cutGroups,eventCounter){
 
+  this.eventCounter = eventCounter;
   this.msg = msg;
   if(typeof msg.buffer === "object") {
     this.bufferContainer = msg.buffer;
@@ -21,18 +22,28 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups){
 	this.ac = ac;
 	this.when = this.msg.when;
 
-	// get basic buffer source, including speed change and sample reversal
-	var last;
-	this.source = last = ac.createBufferSource();
-	this.source.onended = this.disconnectHandler() ;
-	this.disconnectOnEnd(this.source);
+  // pre-process speed, note, begin, and end
 	if(isNaN(parseInt(this.msg.begin))) this.msg.begin = 0;
 	if(isNaN(parseInt(this.msg.end))) this.msg.end = 1;
-	this.begin = this.msg.begin;
-	this.end = this.msg.end;
 	if(isNaN(parseInt(this.msg.speed))) this.msg.speed = 1;
 	if(isNaN(parseInt(this.msg.note))) this.msg.note = 0;
 	this.msg.speed = this.msg.speed * Math.pow(2,this.msg.note/12);
+  // speed parameter takes priority over begin and end
+  // begin should be before end if speed is negative
+  // begin should be after end if speed is positive
+  // so flip them as/if necessary:
+  if( (this.msg.begin < this.msg.end && this.msg.speed < 0)
+   || (this.msg.begin >= this.msg.end && this.msg.speed > 0)) {
+      let x = this.msg.end;
+      this.msg.end = this.msg.begin;
+      this.msg.begin = x;
+  }
+
+  // get basic buffer source, including speed change and sample reversal
+	var last;
+  this.source = last = ac.createBufferSource();
+  this.source.onended = this.disconnectHandler() ;
+  this.disconnectOnEnd(this.source);
 	this.source.playbackRate.value = Math.abs(this.msg.speed);
 
   this.prepareBuffer(); // reverse and accelerate buffer if it is already available and as necessary
@@ -60,24 +71,24 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups){
 	}
 
   // sound transformations/effects
-	this.cut(msg.cut, msg.s);
-	last = this.shape(last, msg.shape);
-	last = this.lowPassFilter(last, msg.cutoff, msg.resonance);
-	last = this.highPassFilter(last, msg.hcutoff, msg.hresonance)
-	last = this.bandPassFilter(last, msg.bandf, msg.bandq)
-	last = this.vowel(last, msg.vowel);
-	last = this.delay(last,msg.delay,msg.delaytime,msg.delayfeedback);
-	last = this.loop(last, msg.loop, msg.begin, msg.end, msg.speed);
-	last = this.crush(last, msg.crush);
-	last = this.coarse(last, msg.coarse);
-	this.unit(msg.unit,msg.speed);
+	this.cut(this.msg.cut, this.msg.s);
+	last = this.shape(last, this.msg.shape);
+	last = this.lowPassFilter(last, this.msg.cutoff, this.msg.resonance);
+	last = this.highPassFilter(last, this.msg.hcutoff, this.msg.hresonance)
+	last = this.bandPassFilter(last, this.msg.bandf, this.msg.bandq)
+	last = this.vowel(last, this.msg.vowel);
+	last = this.delay(last, this.msg.delay, this.msg.delaytime, this.msg.delayfeedback);
+	last = this.loop(last, this.msg.loop, this.msg.begin, this.msg.end, this.msg.speed);
+	last = this.crush(last, this.msg.crush);
+	last = this.coarse(last, this.msg.coarse);
+	this.unit(this.msg.unit, this.msg.speed);
 
 	// gain and panning (currently stereo)
-  var gain = parseFloat(msg.gain);
+  var gain = parseFloat(this.msg.gain);
 	if(isNaN(gain)) gain = 1;
 	if(gain > 2) gain = 2;
 	if(gain < 0) gain = 0;
-  var overgain = parseFloat(msg.overgain);
+  var overgain = parseFloat(this.msg.overgain);
 	if(!isNaN(overgain)) gain = gain + overgain;
   gain = Math.pow(gain,4);
   var pan = parseFloat(msg.pan);
@@ -125,7 +136,18 @@ Graph.prototype.disconnectOnEnd = function(x) {
 }
 
 Graph.prototype.start = function() {
-	this.source.start(this.when,this.begin*this.source.buffer.duration,this.end*this.source.buffer.duration);
+  let absSpeed = Math.abs(this.msg.speed);
+  let sus = Math.abs(this.msg.end - this.msg.begin);
+  if(this.speed == 0 || this.sus == 0) {
+    this.stopAll();
+  }
+  else {
+    sus = sus * this.source.buffer.duration / absSpeed;
+    let offset = 0;
+    if(this.msg.speed > 0) offset = this.msg.begin*this.source.buffer.duration;
+    else offset = this.msg.end*this.source.buffer.duration;
+    this.source.start(this.when,offset,sus);
+  }
 }
 
 Graph.prototype.stopAll = function() {
@@ -139,12 +161,12 @@ Graph.prototype.stopAll = function() {
 }
 
 Graph.prototype.disconnectHandler = function() {
-	var closure = this.source;
+	var closure = this;
 	return function() {
     setTimeout(function(){
-      if(closure.disconnectQueue == null) { throw Error("WebDirt: no disconnectQueue"); }
-      for(var i in closure.disconnectQueue) closure.disconnectQueue[i].disconnect();
-      closure.disconnectQueue = null;
+      if(closure.source.disconnectQueue == null) { throw Error("WebDirt: no disconnectQueue for event " + closure.eventCounter); }
+      for(var i in closure.source.disconnectQueue) closure.source.disconnectQueue[i].disconnect();
+      closure.source.disconnectQueue = null;
     },250);
 	}
 }
@@ -308,15 +330,16 @@ Graph.prototype.bandPassFilter=function(input, bandf, bandq){
 //Loop effect
 //@Calibrate w/ accelerate when accelerate is fully working
 //@get duration of buffer before it is loaded?
+// TO FIX: this is almost certainly broken because of how begin end and speed work...
 Graph.prototype.loop = function(input, loopCount){
 
 	if(isNaN(parseInt(loopCount)) || loopCount==0) return input
 	//Can't get duration of buffer if isn't loaded yet @
 	try{
-	var dur = this.source.buffer.duration-(this.begin*this.source.buffer.duration)-((1-this.end)*this.source.buffer.duration);
+	var dur = this.source.buffer.duration-(this.msg.begin*this.source.buffer.duration)-((1-this.msg.end)*this.source.buffer.duration);
 	this.source.loop=true;
-	this.source.loopStart = this.begin*this.source.buffer.duration
-	this.source.loopEnd = this.end*this.source.buffer.duration
+	this.source.loopStart = this.msg.begin*this.source.buffer.duration
+	this.source.loopEnd = this.msg.end*this.source.buffer.duration
 	this.source.stop(this.when+(dur*loopCount)/this.source.playbackRate.value);
 	return input;
 	}catch(e){
