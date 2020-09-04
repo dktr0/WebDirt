@@ -23,21 +23,23 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups,eventCounter){
 	this.when = this.msg.when;
 
   // pre-process speed, note, begin, and end
-	if(isNaN(parseInt(this.msg.begin))) this.msg.begin = 0;
-	if(isNaN(parseInt(this.msg.end))) this.msg.end = 1;
-	if(isNaN(parseInt(this.msg.speed))) this.msg.speed = 1;
-	if(isNaN(parseInt(this.msg.note))) this.msg.note = 0;
-	this.msg.speed = this.msg.speed * Math.pow(2,this.msg.note/12);
-  // speed parameter takes priority over begin and end
-  // begin should be before end if speed is negative
-  // begin should be after end if speed is positive
-  // so flip them as/if necessary:
-  if( (this.msg.begin < this.msg.end && this.msg.speed < 0)
-   || (this.msg.begin >= this.msg.end && this.msg.speed > 0)) {
-      let x = this.msg.end;
-      this.msg.end = this.msg.begin;
-      this.msg.begin = x;
+  if(isNaN(parseFloat(this.msg.speed))) this.msg.speed = 1;
+  if(this.msg.speed == 0) { this.stopAll(); return; }
+  if(isNaN(parseFloat(this.msg.note))) this.msg.note = 0;
+  this.msg.speed = this.msg.speed * Math.pow(2,this.msg.note/12);
+  this.msg.begin = parseFloatClamped(this.msg.begin,0);
+  this.msg.end = parseFloatClamped(this.msg.end,1);
+  if(this.msg.end == this.msg.begin) { this.stopAll(); return; }
+  if(this.msg.begin > this.msg.end) this.msg.speed = this.msg.speed * (-1);
+  if(this.msg.speed < 0) { // if negative speed, buffer will be reversed, so adjust times accordingly
+    this.msg.begin = 1 - this.msg.begin;
+    this.msg.end = 1 - this.msg.end;
   }
+  if(this.msg.begin > this.msg.end) { // if begin > end, swap so that begin <= end
+      let x = this.msg.begin;
+      this.msg.begin = this.msg.end;
+      this.msg.end = x;
+    }
 
   // get basic buffer source, including speed change and sample reversal
 	var last;
@@ -110,6 +112,14 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups,eventCounter){
 	channelMerger.connect(outputNode);
 }
 
+function parseFloatClamped(x,defaultValue) {
+  let y = parseFloat(x);
+  if(isNaN(y))return defaultValue;
+  if(y>1) return 1;
+  if(y<0) return 0;
+  return y;
+}
+
 Graph.prototype.prepareBuffer = function () {
   if(typeof this.bufferContainer === "object") {
     if(typeof this.bufferContainer.buffer === "object") {
@@ -136,18 +146,11 @@ Graph.prototype.disconnectOnEnd = function(x) {
 }
 
 Graph.prototype.start = function() {
-  let absSpeed = Math.abs(this.msg.speed);
-  let sus = Math.abs(this.msg.end - this.msg.begin);
-  if(this.speed == 0 || this.sus == 0) {
-    this.stopAll();
-  }
-  else {
-    sus = sus * this.source.buffer.duration / absSpeed;
-    let offset = 0;
-    if(this.msg.speed > 0) offset = this.msg.begin*this.source.buffer.duration;
-    else offset = this.msg.end*this.source.buffer.duration;
-    this.source.start(this.when,offset,sus);
-  }
+  let absSpeed = Math.abs(this.msg.speed); // speed should be guaranteed != 0 at this point
+  // and end should be guaranteed > begin at this point
+  let sus = (this.msg.end - this.msg.begin) * this.source.buffer.duration / absSpeed;
+  let offset = this.msg.begin*this.source.buffer.duration;
+  this.source.start(this.when,offset,sus);
 }
 
 Graph.prototype.stopAll = function() {
