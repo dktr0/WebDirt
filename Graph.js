@@ -21,6 +21,12 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups,eventCounter){
 	this.cutGroups = cutGroups;
 	this.ac = ac;
 	this.when = this.msg.when;
+  if(isNaN(this.when)) {
+    console.log("WebDirt: 'when' is null or not a number");
+    return;
+  }
+  this.nudge = parseFloat(this.msg.nudge);
+  if(!isNaN(this.nudge)) this.when = this.when + this.nudge;
 
   // pre-process speed, note, begin, and end
   if(isNaN(parseFloat(this.msg.speed))) this.msg.speed = 1;
