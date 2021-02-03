@@ -114,7 +114,7 @@ WebDirt.prototype.playScore = function(score,latency,finishedCallback) {
   if(latency == null) latency = this.latency;
   var start = this.ac.currentTime;
   var latestOnset = 0;
-  for(var i in score) {
+  for(var i=0; i<score.length; i++) {
     var msg = score[i];
     if(msg.when > latestOnset) latestOnset = msg.when;
     msg.when = msg.when + start;
@@ -136,7 +136,7 @@ WebDirt.prototype.playScoreWhenReady = function(score,latency,readyCallback,fini
   this.initializeWebAudio();
   if(latency == null) latency = this.latency;
   var count = score.length;
-  for(var i in score) {
+  for(var i=0;i<score.length;i++) {
     var msg = score[i];
     var closure = this;
     // begin: a temporary kludge

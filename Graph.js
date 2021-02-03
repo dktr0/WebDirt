@@ -161,9 +161,9 @@ Graph.prototype.start = function() {
 
 Graph.prototype.stopAll = function() {
 	if(this.source.disconnectQueue != null) {
-		for(var i in this.source.disconnectQueue) {
-			this.source.disconnectQueue[i].disconnect();
-		}
+		for(var i=0; i<this.source.disconnectQueue.length; i++) {
+      this.source.disconnectQueue[i].disconnect();
+    }
 		this.source.disconnectQueue = null;
 		try { this.source.stop(); } catch(e) {}
 	}
@@ -174,7 +174,9 @@ Graph.prototype.disconnectHandler = function() {
 	return function() {
     setTimeout(function(){
       if(closure.source.disconnectQueue == null) { throw Error("WebDirt: no disconnectQueue for event " + closure.eventCounter); }
-      for(var i in closure.source.disconnectQueue) closure.source.disconnectQueue[i].disconnect();
+      for(var i=0; i<closure.source.disconnectQueue.length; i++) {
+        closure.source.disconnectQueue[i].disconnect();
+      }
       closure.source.disconnectQueue = null;
     },250);
 	}
