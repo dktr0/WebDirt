@@ -1,8 +1,13 @@
 
 function Graph(msg,ac,sampleBank,outputNode,cutGroups,eventCounter){
 
-  this.eventCounter = eventCounter;
   this.msg = msg;
+  this.ac = ac;
+  this.sampleBank = sampleBank;
+  this.outputNode = outputNode;
+  this.cutGroups = cutGroups;
+  this.eventCounter = eventCounter;
+
   if(typeof msg.buffer === "object") {
     this.bufferContainer = msg.buffer;
   }
@@ -18,8 +23,6 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups,eventCounter){
     if(!sampleBank.getBufferMightSucceed(this.msg.s,this.msg.n)) return;
   }
 
-	this.cutGroups = cutGroups;
-	this.ac = ac;
 	this.when = this.msg.when;
   if(isNaN(this.when)) {
     console.log("WebDirt: 'when' is null or not a number");
@@ -140,8 +143,8 @@ Graph.prototype.prepareBuffer = function () {
       }
     }
   } else {
-    if(this.msg.speed>=0) this.buffer = sampleBank.getBuffer(this.msg.s,this.msg.n);
-    else this.buffer = sampleBank.getReverseBuffer(this.msg.s,this.msg.n);
+    if(this.msg.speed>=0) this.buffer = this.sampleBank.getBuffer(this.msg.s,this.msg.n);
+    else this.buffer = this.sampleBank.getReverseBuffer(this.msg.s,this.msg.n);
     this.buffer = this.accel(this.buffer, this.msg.accelerate, this.msg.speed);
   }
 }
