@@ -1,26 +1,48 @@
-WebDirt = function(sampleMapUrl,sampleFolder,latency,readyCallback,maxLateness,audioContext,destination) {
-  if(sampleMapUrl == null) sampleMapUrl = "sampleMap.json";
-  if(sampleFolder == null) sampleFolder = "samples";
-  if(latency == null) latency = 0.4;
-  this.latency = latency;
-  if(typeof maxLateness != 'number') {
+/*
+
+To create a WebDirt object call new WebDirt, optionally providing arguments in the form of an object.
+All of the 'fields' of the object are optional, and can be null/omitted.
+
+var myWebDirt = new WebDirt({
+  sampleMapUrl: "mySampleMap.json", // URL to a map of available samples if WebDirt is to manage sample loading, default is null (WebDirt doesn't manage samples)
+  sampleFolder: "samples", // URL to where samples are located if WebDirt is to manage sample loading, 'samples' is default
+  readyCallback: function () { console.log("ready!")}, // a callback function to execute when sample map is loaded, if WebDirt is to manage sample loading
+  latency: 0.4, // a value in seconds by which to delay sample onset (eg. to allow sample loading to succeed in the interim)
+  maxLateness: 0.005, //
+  audioContext: myAudioContext, // if provided, WebDirt will use this pre-existing Web Audio API context instead of creating a new one
+  destination: myDestination // if provided, WebDirt will direct output to this Web Audio node instead of the default destination node of the context
+});
+
+*/
+
+WebDirt = function(args) {
+  if(typeof args === 'undefined') args = {};
+  if(typeof args != 'object') {
+    console.log("WebDirt: unable to construct WebDirt object, arguments object not provided to constructor");
+    return;
+  }
+  if(typeof args.sampleMapUrl === 'string') {
+    if(args.sampleFolder == null) args.sampleFolder = "samples";
+    console.log("WebDirt: will manage own sample bank, samplemap=" + args.sampleMapUrl + " sampleFolder=" + args.sampleFolder);
+    this.sampleBank = new SampleBank(args.sampleMapUrl,args.sampleFolder,args.readyCallback);
+  } else console.log("WebDirt: will expect application to provide sample buffers");
+  if(args.latency == null) args.latency = 0.4;
+  this.latency = args.latency;
+  if(typeof args.maxLateness != 'number') {
     this.maxLateness = 0.005;
-  } else this.maxLateness = maxLateness;
-  this.sampleMapUrl = sampleMapUrl;
-  this.sampleFolder = sampleFolder;
-  this.sampleBank = new SampleBank(this.sampleMapUrl,this.sampleFolder,readyCallback);
+  } else this.maxLateness = args.maxLateness;
+  this.ac = args.audioContext;
+  this.destination = args.destination;
   this.cutGroups = new Array;
-  this.ac = audioContext;
-  this.destination = destination;
   this.eventCounter = 0;
   if(this.ac == null) {
-    console.log("WebDirt initialized (without audio context yet)");
+    console.log("WebDirt: initialized (without audio context yet)");
   } else {
     if(this.destination == null) {
       this.destination = this.ac.destination;
-      console.log("WebDirt initialized with provided audio context and audio context destination");
+      console.log("WebDirt: initialized with provided audio context and audio context destination");
     } else {
-      console.log("WebDirt initialized with provided audio context and provided destination")
+      console.log("WebDirt: initialized with provided audio context and provided destination")
     }
   }
 }
@@ -41,7 +63,7 @@ WebDirt.prototype.initializeWebAudio = function() {
       window.AudioContext = window.AudioContext || window.webkitAudioContext;
       this.ac = new AudioContext();
       this.destination = this.ac.destination;
-      console.log("WebDirt audio context created");
+      console.log("WebDirt: own audio context created");
     }
     catch(e) {
       console.log(e);
@@ -52,14 +74,14 @@ WebDirt.prototype.initializeWebAudio = function() {
   if(this.ac != null) {
     if(this.ac.audioWorklet != null) {
       this.ac.audioWorklet.addModule('WebDirt/AudioWorklets.js').then( () => { // *** WARNING: path is not robust to different installation patterns here
-        console.log("WebDirt audio worklets added");
+        console.log("WebDirt: audio worklets added");
       });
     } else {
-      console.log("browser does not support audio worklets - WebDirt will still work but shape, coarse, and crush will have no effect");
+      console.log("WebDirt: browser does not support audio worklets - shape, coarse, and crush will have no effect");
     }
     this.tempo = {time:this.ac.currentTime,beats:0,bpm:30};
     this.clockDiff = (Date.now() / 1000) - this.ac.currentTime;
-    this.sampleBank.ac = this.ac;
+    if(this.sampleBank != null) this.sampleBank.ac = this.ac;
 
     this.silentNote = this.ac.createOscillator();
     this.silentNote.type = 'sine';
@@ -77,7 +99,6 @@ WebDirt.prototype.initializeWebAudio = function() {
       closure.silentGain = null;
       closure.silentNote = null;
     },500);
-    console.log("WebDirt global audio resources allocated");
   }
 }
 
@@ -122,7 +143,6 @@ WebDirt.prototype.playScore = function(score,latency,finishedCallback) {
     if(msg.s != null) msg.sample_name = msg.s;
     if(msg.n != null) msg.sample_n = msg.n;
     // end: a temporary kludge
-    // this.sampleBank.load(msg.sample_name,msg.sample_n); // make an early attempt to load samples, ahead of playback
     this.playSample(msg,latency);
   }
   setTimeout(function() {
@@ -143,7 +163,7 @@ WebDirt.prototype.playScoreWhenReady = function(score,latency,readyCallback,fini
     if(msg.s != null) msg.sample_name = msg.s;
     if(msg.n != null) msg.sample_n = msg.n;
     // end: a temporary kludge
-    this.sampleBank.load(msg.sample_name,msg.sample_n,function() {
+    if(this.sampleBank != null) this.sampleBank.load(msg.sample_name,msg.sample_n,function() {
       count = count - 1;
       if(count<=0) {
         closure.playScore(score,latency,finishedCallback);
@@ -298,6 +318,8 @@ WebDirt.prototype.setTempo = function(x) {
 }
 
 WebDirt.prototype.sampleHint = function(x) {
-  console.log("WebDirt received sample hint: " + x);
-  this.sampleBank.loadAllNamed(x);
+  if(this.sampleBank != null) {
+    console.log("WebDirt received sample hint: " + x);
+    this.sampleBank.loadAllNamed(x);
+  }
 }

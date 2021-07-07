@@ -8,10 +8,17 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups,eventCounter){
   this.cutGroups = cutGroups;
   this.eventCounter = eventCounter;
 
+  // the buffer data for sample playback is provided in one of two ways...
+  // 1. the buffer is directly provided by the calling application (eg. Estuary)
   if(typeof msg.buffer === "object") {
     this.bufferContainer = msg.buffer;
   }
+  // or 2. the buffer is loaded and managed by WebDirt itself, via the "sample bank"
   else {
+    if(typeof this.sampleBank != 'object') {
+      console.log("WebDirt: buffer not provided by calling application + no WebDirt sample bank");
+      return;
+    }
     this.msg.n = parseInt(this.msg.n);
     if(isNaN(this.msg.n)) this.msg.n=0;
     // fail loudly if someone requests a sample not present in the sample map
