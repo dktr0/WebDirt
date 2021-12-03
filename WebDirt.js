@@ -35,6 +35,7 @@ WebDirt = function(args) {
   this.destination = args.destination;
   this.cutGroups = new Array;
   this.eventCounter = 0;
+  this.audioOutputs = 2; // ie. defaults to stereo, change with [WebDirt].audioOutputs = n...;
   if(this.ac == null) {
     console.log("WebDirt: initialized (without audio context yet)");
   } else {
@@ -122,7 +123,7 @@ WebDirt.prototype.playSample = function(msg,latency) {
     return;
   }
 
-  let r = new Graph(msg,this.ac,this.sampleBank,this.destination,this.cutGroups,this.eventCounter);
+  let r = new Graph(msg,this);
   this.eventCounter++;
   return r;
 }

@@ -1,12 +1,13 @@
 
-function Graph(msg,ac,sampleBank,outputNode,cutGroups,eventCounter){
+function Graph(msg,webDirtObject){
 
   this.msg = msg;
-  this.ac = ac;
-  this.sampleBank = sampleBank;
-  this.outputNode = outputNode;
-  this.cutGroups = cutGroups;
-  this.eventCounter = eventCounter;
+  this.ac = webDirtObject.ac;
+  this.sampleBank = webDirtObject.sampleBank;
+  this.outputNode = webDirtObject.destination;
+  this.cutGroups = webDirtObject.cutGroups;
+  this.eventCounter = webDirtObject.eventCounter;
+  this.audioOutputs = webDirtObject.audioOutputs;
 
   // the buffer data for sample playback is provided in one of two ways...
   // 1. the buffer is directly provided by the calling application (eg. Estuary)
@@ -59,7 +60,7 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups,eventCounter){
 
   // get basic buffer source, including speed change and sample reversal
 	var last;
-  this.source = last = ac.createBufferSource();
+  this.source = last = this.ac.createBufferSource();
   this.source.onended = this.disconnectHandler() ;
   this.disconnectOnEnd(this.source);
 	this.source.playbackRate.value = Math.abs(this.msg.speed);
@@ -71,8 +72,8 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups,eventCounter){
 	} // otherwise, the buffer may be available soon, so (if there's time) schedule a timeOut to possibly start it soon...
 	else {
 		var closure = this;
-		var reattemptDelay = (this.msg.when-ac.currentTime-0.2)*1000; // wake-up 0.2 seconds before note start...
-		if(reattemptDelay <= 0) reattemptDelay = (this.msg.when-ac.currentTime-0.2)*1000; // ...or 0.1 seconds if 0.2 not possible
+		var reattemptDelay = (this.msg.when-this.ac.currentTime-0.2)*1000; // wake-up 0.2 seconds before note start...
+		if(reattemptDelay <= 0) reattemptDelay = (this.msg.when-this.ac.currentTime-0.2)*1000; // ...or 0.1 seconds if 0.2 not possible
 		if(reattemptDelay > 0) {
 			setTimeout(function(){
         closure.prepareBuffer();
@@ -102,6 +103,7 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups,eventCounter){
 	this.unit(this.msg.unit, this.msg.speed);
 
 	// gain and panning (currently stereo)
+  // sanitize gain and pan parameters...
   var gain = parseFloat(this.msg.gain);
 	if(isNaN(gain)) gain = 1;
 	if(gain > 2) gain = 2;
@@ -111,21 +113,37 @@ function Graph(msg,ac,sampleBank,outputNode,cutGroups,eventCounter){
   gain = Math.pow(gain,4);
   var pan = parseFloat(msg.pan);
 	if(isNaN(pan)) pan = 0.5;
-	var gain1 = ac.createGain();
+  // determine speaker pairs and position between those speakers
+  var actualPan,spkr1,spkr2;
+  if(this.audioOutputs == 2) {
+    if(pan>1 || pan<0)pan = pan-Math.floor(pan);
+    actualPan = pan;
+    spkr1 = 0;
+    spkr2 = 1;
+  } else { // multichannel
+    pan=pan-Math.floor(pan); // remap pan to [0,1)
+    var x = pan * this.audioOutputs;
+    spkr1 = Math.floor(x);
+    spkr2 = spkr1 + 1;
+    if(spkr2 >= this.audioOutputs) spkr2 = 0;
+    actualPan = x - Math.floor(x);
+  }
+  // create gain and channel merger nodes to realize gain and panning
+	var gain1 = this.ac.createGain();
 	this.disconnectOnEnd(gain1);
-	var gain2 = ac.createGain();
+	var gain2 = this.ac.createGain();
 	this.disconnectOnEnd(gain2);
-	gain1.gain.value = Math.cos(pan*Math.PI/2)*gain;
-	gain2.gain.value = Math.sin(pan*Math.PI/2)*gain;
+	gain1.gain.value = Math.cos(actualPan*Math.PI/2)*gain;
+	gain2.gain.value = Math.sin(actualPan*Math.PI/2)*gain;
 	last.connect(gain1);
 	last.connect(gain2);
   this.gain1 = gain1;
   this.gain2 = gain2;
-	var channelMerger = ac.createChannelMerger(2);
+	var channelMerger = this.ac.createChannelMerger(this.audioOutputs);
 	this.disconnectOnEnd(channelMerger);
-	gain1.connect(channelMerger,0,0);
-	gain2.connect(channelMerger,0,1);
-	channelMerger.connect(outputNode);
+	gain1.connect(channelMerger,0,spkr1);
+	gain2.connect(channelMerger,0,spkr2);
+	channelMerger.connect(this.outputNode);
 }
 
 function parseFloatClamped(x,defaultValue) {
