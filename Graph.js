@@ -41,7 +41,7 @@ function Graph(msg,webDirtObject){
 
   // pre-process speed, note, begin, and end
   if(isNaN(parseFloat(this.msg.speed))) this.msg.speed = 1;
-  if(this.msg.speed == 0) { this.stopAll(); return; }
+  if(this.msg.speed == 0) return;
   if(isNaN(parseFloat(this.msg.note))) this.msg.note = 0;
   this.msg.speed = this.msg.speed * Math.pow(2,this.msg.note/12);
   this.msg.begin = parseFloatClamped(this.msg.begin,0);
@@ -188,13 +188,15 @@ Graph.prototype.start = function() {
 }
 
 Graph.prototype.stopAll = function() {
-	if(this.source.disconnectQueue != null) {
-		for(var i=0; i<this.source.disconnectQueue.length; i++) {
-      this.source.disconnectQueue[i].disconnect();
-    }
-		this.source.disconnectQueue = null;
-		try { this.source.stop(); } catch(e) {}
-	}
+  if(this.source != null) {
+	  if(this.source.disconnectQueue != null) {
+		  for(var i=0; i<this.source.disconnectQueue.length; i++) {
+        this.source.disconnectQueue[i].disconnect();
+      }
+		  this.source.disconnectQueue = null;
+		  try { this.source.stop(); } catch(e) {}
+	  }
+  }
 }
 
 Graph.prototype.disconnectHandler = function() {
