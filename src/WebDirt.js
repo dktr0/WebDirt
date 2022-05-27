@@ -20,6 +20,7 @@ import './SampleBank.js';
 export * from './SampleBank.js';
 
 export function WebDirt(args) {
+  this.workletsAvailable = false; // changes to true when worklets loaded
   if(typeof args === 'undefined') args = {};
   if(typeof args != 'object') {
     console.log("WebDirt: unable to construct WebDirt object, arguments object not provided to constructor");

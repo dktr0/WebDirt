@@ -8,6 +8,7 @@ export default function Graph(msg,webDirtObject){
   this.cutGroups = webDirtObject.cutGroups;
   this.eventCounter = webDirtObject.eventCounter;
   this.audioOutputs = webDirtObject.audioOutputs;
+  this.workletsAvailable = webDirtObject.workletsAvailable;
 
   // the buffer data for sample playback is provided in one of two ways...
   // 1. the buffer is directly provided by the calling application (eg. Estuary)
@@ -220,7 +221,7 @@ Graph.prototype.disconnectHandler = function() {
 Graph.prototype.coarse = function(input, coarse){
   coarse = parseInt(coarse);
   if(isNaN(coarse)) coarse = 1;
-  if(coarse > 1 && this.ac.audioWorklet != null) {
+  if(coarse > 1 && this.workletsAvailable) {
     var coarseProcessorNode = new AudioWorkletNode(this.ac,'coarse-processor');
     coarseProcessorNode.parameters.get('coarse').value = coarse;
     input.connect(coarseProcessorNode);
@@ -234,7 +235,7 @@ Graph.prototype.coarse = function(input, coarse){
 Graph.prototype.crush = function(input, crush){
   crush = parseInt(crush);
   if(isNaN(crush)) crush = null;
-  if(crush!=null && crush>0 && this.ac.audioWorklet != null) {
+  if(crush!=null && crush>0 && this.workletsAvailable) {
     var crushProcessorNode = new AudioWorkletNode(this.ac,'crush-processor');
     crushProcessorNode.parameters.get('crush').value = crush;
     input.connect(crushProcessorNode);
@@ -483,7 +484,7 @@ Graph.prototype.shape = function(input, shape){
   shape = parseFloat(shape);
   if(isNaN(shape)) shape = 0;
 	if(shape >= 1) shape = 0.999;
-  if(shape>0 && this.ac.audioWorklet != null ) {
+  if(shape>0 && this.workletsAvailable) {
     var shapeProcessorNode = new AudioWorkletNode(this.ac,'shape-processor');
     shapeProcessorNode.parameters.get('shape').value = shape;
     input.connect(shapeProcessorNode);
