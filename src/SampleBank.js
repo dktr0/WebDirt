@@ -89,8 +89,11 @@ SampleBank.prototype.load = function(filename,callbackWhenReady) {
 }
 
 
-// note: will throw exception if sample map doesn't exist
 SampleBank.prototype.sampleNameExists = function(name) {
+  if(this.sampleMap == null) {
+    console.log("WebDirt: can't lookup sample bank because sampleMap doesn't exist");
+    return false;
+  }
   if(this.sampleMap[name] == null) return false;
   return true;
 }

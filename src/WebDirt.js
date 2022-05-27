@@ -16,8 +16,7 @@ var myWebDirt = new WebDirt({
 */
 
 import Graph from './Graph.js';
-import './SampleBank.js';
-export * from './SampleBank.js';
+import SampleBank from './SampleBank.js';
 
 export function WebDirt(args) {
   this.workletsAvailable = false; // changes to true when worklets loaded
@@ -42,13 +41,13 @@ export function WebDirt(args) {
   this.eventCounter = 0;
   this.audioOutputs = 2; // ie. defaults to stereo, change with [WebDirt].audioOutputs = n...;
   if(this.ac == null) {
-    console.log("WebDirt: initialized (without audio context yet)");
+    console.log("WebDirt: initialized (without audio context)");
   } else {
     if(this.destination == null) {
       this.destination = this.ac.destination;
-      console.log("WebDirt: initialized with provided audio context and audio context destination");
+      console.log("WebDirt: initialized with provided context");
     } else {
-      console.log("WebDirt: initialized with provided audio context and provided destination")
+      console.log("WebDirt: initialized with provided context + destination")
     }
   }
 }
@@ -113,11 +112,11 @@ WebDirt.prototype.initializeWebAudio = function() {
       closure.silentNote = null;
     },500);
   }
+  console.log("WebDirt: initializeWebAudio finished.")
 }
 
 
 WebDirt.prototype.playSample = function(msg,latency) {
-  let z = new Graph(msg,this); // REMOVE THIS - just for a webpack test!!!!
   // this.initializeWebAudio();
   if(latency == null) latency = this.latency;
   if(msg.whenPosix != null) {

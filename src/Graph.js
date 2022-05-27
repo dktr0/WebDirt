@@ -17,6 +17,10 @@ export default function Graph(msg,webDirtObject){
   }
   // or 2. the buffer is loaded and managed by WebDirt itself, via the "sample bank"
   else {
+    if(this.sampleBank == null) {
+      console.log("WebDirt: there is no sample bank, cancelling event");
+      return;
+    }
     if(typeof this.sampleBank != 'object') {
       console.log("WebDirt: buffer not provided by calling application + no WebDirt sample bank");
       return;
@@ -24,12 +28,12 @@ export default function Graph(msg,webDirtObject){
     this.msg.n = parseInt(this.msg.n);
     if(isNaN(this.msg.n)) this.msg.n=0;
     // fail loudly if someone requests a sample not present in the sample map
-    if(!sampleBank.sampleNameExists(this.msg.s)) {
+    if(!this.sampleBank.sampleNameExists(this.msg.s)) {
       console.log("WebDirt: no sample named " + this.msg.s + " exists in sample map");
       return;
     }
     // fail silently if we have already had a fatal error loading this specific sample
-    if(!sampleBank.getBufferMightSucceed(this.msg.s,this.msg.n)) return;
+    if(!this.sampleBank.getBufferMightSucceed(this.msg.s,this.msg.n)) return;
   }
 
 	this.when = this.msg.when;
