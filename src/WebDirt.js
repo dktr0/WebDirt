@@ -15,7 +15,11 @@ var myWebDirt = new WebDirt({
 
 */
 
-WebDirt = function(args) {
+import Graph from './Graph.js';
+import './SampleBank.js';
+export * from './SampleBank.js';
+
+export function WebDirt(args) {
   if(typeof args === 'undefined') args = {};
   if(typeof args != 'object') {
     console.log("WebDirt: unable to construct WebDirt object, arguments object not provided to constructor");
@@ -76,9 +80,16 @@ WebDirt.prototype.initializeWebAudio = function() {
     if(this.ac.audioWorklet != null) {
       this.ac.audioWorklet.addModule('WebDirt/AudioWorklets.js').then( () => { // *** WARNING: path is not robust to different installation patterns here
         console.log("WebDirt: audio worklets added");
+        this.workletsAvailable = true;
+      }).catch( err => {
+        console.log("WebDirt: error loading AudioWorklets.js: " + err);
+        console.log("(WebDirt should still work but shape, coarse, and crush will have no effect)");
+        this.workletsAvailable = false;
       });
     } else {
-      console.log("WebDirt: browser does not support audio worklets - shape, coarse, and crush will have no effect");
+      console.log("WebDirt: browser does not support audio worklets");
+      console.log("(WebDirt should still work but shape, coarse, and crush will have no effect)");
+      this.workletsAvailable = false;
     }
     this.tempo = {time:this.ac.currentTime,beats:0,bpm:30};
     this.clockDiff = (Date.now() / 1000) - this.ac.currentTime;
@@ -105,6 +116,7 @@ WebDirt.prototype.initializeWebAudio = function() {
 
 
 WebDirt.prototype.playSample = function(msg,latency) {
+  let z = new Graph(msg,this); // REMOVE THIS - just for a webpack test!!!!
   // this.initializeWebAudio();
   if(latency == null) latency = this.latency;
   if(msg.whenPosix != null) {

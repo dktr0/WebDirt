@@ -1,5 +1,5 @@
 
-function Graph(msg,webDirtObject){
+export default function Graph(msg,webDirtObject){
 
   this.msg = msg;
   this.ac = webDirtObject.ac;
@@ -568,7 +568,7 @@ Graph.prototype.vowel= function (input, vowel){
 }
 
 
-vowelFormant = {
+export var vowelFormant = {
 	a: {freqs:[660, 1120, 2750, 3000,3350],  amps: [1, 0.5012, 0.0708, 0.0631, 0.0126], qs:[80, 90, 120, 130, 140]},
 	e: {freqs:[440, 1800, 2700, 3000, 3300], amps: [1, 0.1995, 0.1259, 0.1, 0.1], qs: [70, 80, 100, 120, 120]},
 	i: {freqs:[270, 1850, 2900, 3350, 3590], amps: [1, 0.0631, 0.0631, 0.0158, 0.0158], qs:[40, 90, 100, 120, 120]},

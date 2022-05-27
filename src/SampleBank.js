@@ -3,7 +3,7 @@
 // so before doing anything with a newly created SampleBank object you should set it's property ac to
 // a valid audio context.
 
-SampleBank = function(sampleMapUrl,urlPrefix,readyCallback) {
+export default function SampleBank(sampleMapUrl,urlPrefix,readyCallback) {
   this.STATUS_PRELOAD = 0;
   this.STATUS_LOADING = 1;
   this.STATUS_READY = 2;
