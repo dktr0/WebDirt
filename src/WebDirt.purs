@@ -1,20 +1,14 @@
-module WebDirt (
-  Options,
-  WebDirt,
-  newWebDirt,
-  initializeWebAudio,
-  Parameters,
-  playSample,
-  sampleHint
-  ) where
+module WebDirt where
 
 import Prelude (Unit)
 import Effect (Effect)
-import Option as Option
-import Foreign
-import Simple.JSON as JSON
 
-type Options = Option.Record () (
+foreign import data WebDirt :: Type
+
+{-
+
+These are the fields/options for the record passed to newWebDirt:
+
   sampleMapUrl :: String, -- URL to old-style sample map, if not given WebDirt assumes caller will provide buffers
   sampleFolder :: String, -- URL to where samples are located if WebDirt has an old-style sample map (default: 'samples')
   -- readyCallback ... TODO: currently not implemented in PureScript binding
@@ -22,18 +16,17 @@ type Options = Option.Record () (
   maxLateness :: Number,
   audioContext :: Foreign, -- way of providing an existing Web Audio API context for WebDirt to use
   destination :: Foreign -- way of providing an existing Web Audio API node to which WebDirt will direct output
-  )
 
-foreign import data WebDirt :: Type
+-}
 
-newWebDirt :: Options -> Effect WebDirt
-newWebDirt os = _newWebDirt (JSON.write os)
-
-foreign import _newWebDirt :: Foreign -> Effect WebDirt
+foreign import newWebDirt :: forall opts. Record opts -> Effect WebDirt
 
 foreign import initializeWebAudio :: WebDirt -> Effect Unit
 
-type Parameters = Option.Record () (
+{-
+
+These are the fields/options for the record passed to playSample:
+
   buffer :: Foreign, -- Web Audio buffer of sample data to play (ie. new-style)
   s :: String, -- name of sample bank (ie. old-style with sampleMap)
   n :: Int, -- number of sample within a bank (ie. old-style with sampleMap)
@@ -63,11 +56,9 @@ type Parameters = Option.Record () (
   crush :: Number,
   coarse :: Number,
   unit :: String
-  )
 
-playSample :: WebDirt -> Parameters -> Effect Unit
-playSample wd ps = _playSample wd (JSON.write ps)
+-}
 
-foreign import _playSample :: WebDirt -> Foreign -> Effect Unit
+foreign import playSample :: WebDirt -> forall props. Record props -> Effect Unit
 
 foreign import sampleHint :: WebDirt -> String -> Effect Unit

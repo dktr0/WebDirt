@@ -1,9 +1,9 @@
 "use strict";
 
-exports._newWebDirt = args => () => new WebDirt.WebDirt(args);
+export const newWebDirt = args => () => new WebDirt.WebDirt(args);
 
-exports.initializeWebAudio = wd => () => wd.initializeWebAudio();
+export const initializeWebAudio = wd => () => wd.initializeWebAudio();
 
-exports._playSample = wd => msg => () => wd.playSample(msg);
+export const playSample = wd => msg => () => wd.playSample(msg);
 
-exports.sampleHint = wd => bankName => () => wd.sampleHint(bankName);
+export const sampleHint = wd => bankName => () => wd.sampleHint(bankName);
