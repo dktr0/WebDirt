@@ -2,51 +2,107 @@
 
 WebDirt as a PureScript library
 
-By way of notes about how to integrate it, an example of a from scratch web page that makes sound using this all...
+## Make sure you have v0.15 of PureScript
 
-Make a new empty PureScript project:
+You'll definitely need v0.15 of PureScript, as well as spago and esbuild. Both the purescript-webdirt library and the examples on this page require the level support for ES6 JavaScript modules provided by purescript 0.15. You can check your PureScript version with this at the terminal:
 
 ```
-mkdir aProject
-cd aProject
-spago init
+purs --version
 ```
 
-Since this PureScript library is not part of the default package set, it needs to be added to packages.dhall... TODO (just working out an issue with accessing a purescript package from a subfolder of a repository...)
+If you installed PureScript with npm (most common method), then you can probably update your PureScript, spago and esbuild to the newest version something like this...
 
-Get WebDirt-packed.js and AudioWorklets.js from the dist folder of the WebDirt repository and place them where you'll be serving from.
-
-Here's an example Main.purs for the project:
 ```
-module Main where
+cd ~
+sudo npm --location=global update
+sudo npm --location=global install purescript spago esbuild
+```
+
+...and then use ```purs --version``` again to check the version now available.
+
+## Add the purescript-webdirt library to a project
+
+If you are trying to add WebDirt support to a project that you started while working with an earlier version of PureScript, you'll want to update the default package set in that project to the 0.15.x package set as well, which you can do like this:
+
+```
+cd myExistingProject
+spago upgrade-set
+```
+
+You'll need to add a reference to a specific commit/version of the purescript-webdirt library to your project's packages.dhall file. Here is an example of a minimal packages.dhall that just references the default package set and a specific commit/version of purescript-webdirt.
+
+```
+let upstream =
+      https://github.com/purescript/package-sets/releases/download/psc-0.15.0-20220527/packages.dhall
+        sha256:15dd8041480502850e4043ea2977ed22d6ab3fc24d565211acde6f8c5152a799
+
+in  upstream
+  with purescript-webdirt =
+    { dependencies = [ "prelude" , "effect" ]
+    , repo = "https://github.com/dktr0/WebDirt.git"
+    , version = "6fc66e5f1b60a49c2326a1bcd79756bd68115e2a"
+    }
+```
+
+In the example above, version can be changed to the most recent commit hash from dktr0's WebDirt repository on github. After that, you'll need to install purescript-webdirt in your project:
+
+```
+spago install purescript-webdirt
+```
+
+## An example
+
+Here's an example of a PureScript module that uses purescript-webdirt. It provides two entry points 'launch' and 'makeSound' that are thin wrappers around purescript-webdirt functions. 'launch' creates a WebDirt object that we'll need to hang on to and use to do things with WebDirt, and also calls WebDirt's initializeWebAudio functionality (note: WebDirt's initializeWebAudio must be called even in applications that provide their own audio context - it does more than simply initialize the Web Audio context). 'makeSound' uses WebDirt's playSample to play a specific sample from a bank of samples as soon as possible.
+
+```
+module Whatever where
 
 import Prelude
 import Effect (Effect)
 import WebDirt
-import Option (fromRecord')
-
-main :: Effect Unit
-main = pure unit
 
 launch :: Effect WebDirt
 launch = do
-  webDirt <- newWebDirt $ fromRecord' { sampleMapUrl: "samples/sampleMap.json", sampleFolder: "samples" }
-  initializeWebAudio webDirt
-  pure webDirt
+  wd <- newWebDirt { sampleMapUrl: "samples/sampleMap.json", sampleFolder: "samples" }
+  initializeWebAudio wd
+  pure wd
+
+makeSound :: WebDirt -> Effect Unit
+makeSound wd = playSample wd { s: "gtr", n: "0"}
 ```
 
-Build the above with spago bundle-app and make sure the index.js is available where you are serving from.
-
-Here's an example index.html for the project - make it available from where you are serving from:
+A project containing a module like the one above can be built with ```spago bundle-module``` and the resulting index.js will be an ES6-compliant JavaScript module that can be included in an HTML page. Here's a simple example of such inclusion:
 
 ```
 <html>
-<body onload="wd=PS['Main'].launch()">
- <script src="./WebDirt-packed.js"></script>
- <script src="./index.js"></script>
- <button onclick="PS['Main'].makeASound(wd)()">Press Me</button>
+<body onload="launch()">
+
+ <script src="./WebDirt/WebDirt-packed.js"></script> <!-- import WebDirt JS library -->
+
+ <script type="module">
+import * as WebDirt from './index.js'; // import our compiled purescript module
+window.launch = function () { window.webDirt = WebDirt.launch(); }
+window.makeSound = function () { WebDirt.makeSound(window.webDirt)(); }
+ </script>
+
+ <button onclick="makeSound()">Make Sound</button>
+
 </body>
 </html>
 ```
 
-The above assumes that an old-style sample map (made with script makeSampleMap.sh in the old folder of WebDirt repository) is at the location samples/sampleMap.json relative to where you are serving from, and that the subfolder samples contains all the samples.
+For the example above to work, a number of files have to be in specific place from which files are served by a web server:
+
+-WebDirt-packed.js must be in a folder called WebDirt, under the top folder of what is being served. This file can be found in the dist folder of the WebDirt repository.
+-AudioWorklets.js must be in a folder called WebDirt, under the top folder of what is being served. This file can be found in the dist folder of the WebDirt repository.
+-There must be a folder called samples under the top folder of what is being served, containing folders of sample files. For example, you could copy the popular Dirt-Samples library and rename it samples.
+-The samples folder must contain a "sampleMap" file called sampleMap.json generated by the makeSampleMap.sh script in the WebDirt repository.
+
+Here's an example of how to use makeSampleMap.sh to generate a sampleMap:
+
+```
+cd whereverSamplesAre
+/path/to/WebDirtRepository/old/makeSampleMap.sh . > sampleMap.json
+```
+
+The Estuary discord server is the best place to reach out for assistance with any of this.
