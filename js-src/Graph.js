@@ -164,11 +164,9 @@ Graph.prototype.prepareBuffer = function () {
     if(typeof this.bufferContainer.buffer === "object") {
       if(this.msg.speed>=0) this.buffer = this.bufferContainer.buffer;
       else { // need reverse buffer
-        if(this.bufferContainer.reverseBuffer != null) {
-          if(typeof this.bufferContainer.reverseBuffer === "object") this.buffer = this.bufferContainer.reverseBuffer;
-        }
+        if(typeof this.bufferContainer.reverseBuffer === "object") this.buffer = this.bufferContainer.reverseBuffer;
         else { // calculate reverse buffer and store
-          this.bufferContainer.reverseBuffer = reverseBuffer(this.ac,this.bufferContainer.buffer);
+          this.bufferContainer.reverseBuffer = this.reverseBuffer(this.ac,this.bufferContainer.buffer);
           this.buffer = this.bufferContainer.reverseBuffer;
         }
       }
@@ -573,6 +571,21 @@ Graph.prototype.vowel= function (input, vowel){
 	else return input
 }
 
+Graph.prototype.reverseBuffer = function(ac,buffer) {
+  var frames = buffer.length;
+  var pcmData = new Float32Array(frames);
+  var newBuffer = ac.createBuffer(buffer.numberOfChannels,buffer.length,ac.sampleRate);
+  var newChannelData = new Float32Array(frames);
+  for(var channel=0; channel<buffer.numberOfChannels; channel++) {
+    buffer.copyFromChannel(pcmData,channel,0);
+    for (var i =0;i<frames;i++) newChannelData[i]=pcmData[frames-i];
+    // First element of newChannelData will be set to NaN - causes clipping on first frame
+    // set to second element to get rid of clipping
+    newChannelData[0]=newChannelData[1];
+    newBuffer.copyToChannel(newChannelData,channel,0);
+  }
+  return newBuffer;
+}
 
 export var vowelFormant = {
 	a: {freqs:[660, 1120, 2750, 3000,3350],  amps: [1, 0.5012, 0.0708, 0.0631, 0.0126], qs:[80, 90, 120, 130, 140]},
