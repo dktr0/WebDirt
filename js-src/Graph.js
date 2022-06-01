@@ -164,8 +164,9 @@ Graph.prototype.prepareBuffer = function () {
     if(typeof this.bufferContainer.buffer === "object") {
       if(this.msg.speed>=0) this.buffer = this.bufferContainer.buffer;
       else { // need reverse buffer
-        if(typeof this.bufferContainer.reverseBuffer === "object")
-          this.buffer = this.bufferContainer.reverseBuffer;
+        if(this.bufferContainer.reverseBuffer != null) {
+          if(typeof this.bufferContainer.reverseBuffer === "object") this.buffer = this.bufferContainer.reverseBuffer;
+        }
         else { // calculate reverse buffer and store
           this.bufferContainer.reverseBuffer = reverseBuffer(this.ac,this.bufferContainer.buffer);
           this.buffer = this.bufferContainer.reverseBuffer;

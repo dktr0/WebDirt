@@ -1,0 +1,22 @@
+<html>
+<body onload="launch()">
+
+ <script src="./WebDirt-packed.js"></script> <!-- import WebDirt JS library -->
+
+ <script type="module">
+import * as WebDirt from './index.js'; // import our compiled purescript module
+window.launch = function () { window.webDirt = WebDirt.launch(); }
+window.makeSound0 = function () { WebDirt.makeSound0(window.webDirt)(); }
+window.makeSound4 = function () { WebDirt.makeSound4(window.webDirt)(); }
+window.makeSound7 = function () { WebDirt.makeSound7(window.webDirt)(); }
+window.makeSoundBackwards = function () { WebDirt.makeSoundBackwards(window.webDirt)(); }
+
+ </script>
+
+ <button onclick="makeSound0()">Make Sound 0</button>
+ <button onclick="makeSound4()">Make Sound 4</button>
+ <button onclick="makeSound7()">Make Sound 7</button>
+ <button onclick="makeSoundBackwards()">Make Sound Backwards</button>
+
+</body>
+</html>
