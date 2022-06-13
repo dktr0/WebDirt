@@ -1,8 +1,8 @@
 {
-  "name": "WebDirt",
+  "name": "webdirt",
   "version": "1.0.0",
   "description": "WebDirt is a rewrite of Alex McLean's Dirt sampling engine (by Alex McLean) to run in the web browser using the Web Audio API. Contributors are Jamie Beverley and David Ogborn. It was created for (and can be tried, live, in) the Estuary live coding platform: https://github.com/dktr0/Estuary.git",
-  "main": "index.js",
+  "main": "dist/WebDirt-packed.js",
   "private": true,
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
