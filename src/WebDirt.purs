@@ -62,3 +62,5 @@ These are the fields/options for the record passed to playSample:
 foreign import playSample :: WebDirt -> forall props. Record props -> Effect Unit
 
 foreign import sampleHint :: WebDirt -> String -> Effect Unit
+
+foreign import voices :: WebDirt -> Effect Int

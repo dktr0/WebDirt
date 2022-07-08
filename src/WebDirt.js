@@ -7,3 +7,5 @@ export const initializeWebAudio = wd => () => wd.initializeWebAudio();
 export const playSample = wd => msg => () => wd.playSample(msg);
 
 export const sampleHint = wd => bankName => () => wd.sampleHint(bankName);
+
+export const voices = wd => () => wd.voices;

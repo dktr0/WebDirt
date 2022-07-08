@@ -2,6 +2,7 @@
 export default function Graph(msg,webDirtObject){
 
   this.msg = msg;
+  this.webDirt = webDirtObject;
   this.ac = webDirtObject.ac;
   this.sampleBank = webDirtObject.sampleBank;
   this.outputNode = webDirtObject.destination;
@@ -22,14 +23,14 @@ export default function Graph(msg,webDirtObject){
       return;
     }
     if(typeof this.sampleBank != 'object') {
-      console.log("WebDirt: buffer not provided by calling application + no WebDirt sample bank");
+      console.log("WebDirt: buffer not provided by calling app + no WebDirt sample bank, cancelling event");
       return;
     }
     this.msg.n = parseInt(this.msg.n);
     if(isNaN(this.msg.n)) this.msg.n=0;
     // fail loudly if someone requests a sample not present in the sample map
     if(!this.sampleBank.sampleNameExists(this.msg.s)) {
-      console.log("WebDirt: no sample named " + this.msg.s + " exists in sample map");
+      console.log("WebDirt: no sample named " + this.msg.s + " exists in sample map, cancelling event");
       return;
     }
     // fail silently if we have already had a fatal error loading this specific sample
@@ -38,7 +39,7 @@ export default function Graph(msg,webDirtObject){
 
 	this.when = this.msg.when;
   if(isNaN(this.when)) {
-    console.log("WebDirt: 'when' is null or not a number");
+    console.log("WebDirt: 'when' is null or not a number, cancelling event");
     return;
   }
   this.nudge = parseFloat(this.msg.nudge);
@@ -62,6 +63,10 @@ export default function Graph(msg,webDirtObject){
       this.msg.begin = this.msg.end;
       this.msg.end = x;
     }
+
+  // if we get this far, Web Audio nodes are going to be allocated
+  // so increment the voice count:
+  this.webDirt.voices = this.webDirt.voices + 1;
 
   // get basic buffer source, including speed change and sample reversal
 	var last;
@@ -199,6 +204,7 @@ Graph.prototype.stopAll = function() {
       }
 		  this.source.disconnectQueue = null;
 		  try { this.source.stop(); } catch(e) {}
+      this.webDirt.voices = this.webDirt.voices - 1;
 	  }
   }
 }
@@ -212,6 +218,7 @@ Graph.prototype.disconnectHandler = function() {
         closure.source.disconnectQueue[i].disconnect();
       }
       closure.source.disconnectQueue = null;
+      closure.webDirt.voices = closure.webDirt.voices - 1;
     },250);
 	}
 }
